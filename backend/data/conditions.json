@@ -1,0 +1,103 @@
+{
+    "conditions": {
+      "tension_headache": {
+        "name": "Tension Headache",
+        "symptoms": ["headache", "neck tension", "stress"],
+        "description": "Most common type of headache, often caused by stress, poor posture, or muscle tension",
+        "self_care": [
+          "Rest in a quiet, dark room",
+          "Apply cold or warm compress to head/neck",
+          "Over-the-counter pain relievers (acetaminophen, ibuprofen)",
+          "Gentle neck and shoulder stretches",
+          "Stay hydrated",
+          "Practice relaxation techniques"
+        ],
+        "when_to_seek_care": "If headaches become frequent, severe, or interfere with daily activities",
+        "urgency": "low"
+      },
+      "migraine": {
+        "name": "Migraine",
+        "symptoms": ["severe headache", "nausea", "light sensitivity", "sound sensitivity"],
+        "description": "Intense headache often accompanied by nausea, vomiting, and sensitivity to light and sound",
+        "self_care": [
+          "Rest in a quiet, dark room",
+          "Cold compress on forehead",
+          "Stay hydrated",
+          "Avoid known triggers",
+          "Consider over-the-counter pain relief"
+        ],
+        "when_to_seek_care": "If this is your first severe headache, or if pattern changes significantly",
+        "urgency": "medium"
+      },
+      "viral_upper_respiratory": {
+        "name": "Viral Upper Respiratory Infection",
+        "symptoms": ["cough", "runny nose", "sore throat", "low fever", "fatigue"],
+        "description": "Common cold or viral infection affecting the upper respiratory system",
+        "self_care": [
+          "Get plenty of rest",
+          "Drink lots of fluids",
+          "Use humidifier or breathe steam",
+          "Throat lozenges for sore throat",
+          "Over-the-counter medications for symptom relief",
+          "Saltwater gargle"
+        ],
+        "when_to_seek_care": "If symptoms worsen after a week, develop high fever, or have difficulty breathing",
+        "urgency": "low"
+      },
+      "gastroenteritis": {
+        "name": "Gastroenteritis (Stomach Bug)",
+        "symptoms": ["nausea", "vomiting", "diarrhea", "abdominal cramps", "low fever"],
+        "description": "Inflammation of the stomach and intestines, usually caused by viral or bacterial infection",
+        "self_care": [
+          "Stay hydrated with small, frequent sips of water",
+          "BRAT diet (bananas, rice, applesauce, toast)",
+          "Avoid dairy, fatty, or spicy foods",
+          "Rest and avoid solid foods initially",
+          "Electrolyte solutions if available"
+        ],
+        "when_to_seek_care": "If unable to keep fluids down for 24+ hours, signs of severe dehydration, or blood in vomit/stool",
+        "urgency": "medium"
+      },
+      "anxiety_related": {
+        "name": "Anxiety-Related Symptoms",
+        "symptoms": ["chest pain", "rapid heartbeat", "shortness of breath", "nausea", "dizziness"],
+        "description": "Physical symptoms that can occur due to anxiety or panic",
+        "self_care": [
+          "Practice deep breathing exercises",
+          "Find a calm, comfortable environment",
+          "Use relaxation techniques",
+          "Light exercise or walking",
+          "Limit caffeine intake",
+          "Consider speaking with a counselor"
+        ],
+        "when_to_seek_care": "If symptoms are severe, persistent, or significantly impact daily life",
+        "urgency": "medium"
+      }
+    },
+    "emergency_conditions": {
+      "heart_attack": {
+        "name": "Possible Heart Attack",
+        "symptoms": ["crushing chest pain", "pain radiating to arm/jaw", "shortness of breath", "sweating", "nausea"],
+        "action": "CALL 911 IMMEDIATELY",
+        "urgency": "emergency"
+      },
+      "stroke": {
+        "name": "Possible Stroke",
+        "symptoms": ["sudden severe headache", "facial drooping", "arm weakness", "speech difficulty", "sudden confusion"],
+        "action": "CALL 911 IMMEDIATELY",
+        "urgency": "emergency"
+      },
+      "severe_allergic_reaction": {
+        "name": "Severe Allergic Reaction",
+        "symptoms": ["difficulty breathing", "swelling of face/throat", "widespread rash", "rapid pulse", "dizziness"],
+        "action": "CALL 911 IMMEDIATELY - Use EpiPen if available",
+        "urgency": "emergency"
+      },
+      "meningitis": {
+        "name": "Possible Meningitis",
+        "symptoms": ["severe headache", "fever", "neck stiffness", "sensitivity to light", "rash"],
+        "action": "SEEK IMMEDIATE EMERGENCY CARE",
+        "urgency": "emergency"
+      }
+    }
+  }

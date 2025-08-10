@@ -1,0 +1,174 @@
+{
+    "pain_relievers": [
+      {
+        "name": "Acetaminophen (Tylenol)",
+        "active_ingredient": "acetaminophen",
+        "uses": ["headache", "fever", "muscle pain"],
+        "general_dosage": "Adults: 325-650mg every 4-6 hours, max 3000mg/day",
+        "warnings": ["Do not exceed maximum daily dose", "Avoid alcohol", "Liver damage risk"],
+        "contraindications": ["liver disease", "alcohol dependence"]
+      },
+      {
+        "name": "Ibuprofen (Advil, Motrin)",
+        "active_ingredient": "ibuprofen",
+        "uses": ["headache", "fever", "inflammation", "muscle pain"],
+        "general_dosage": "Adults: 200-400mg every 4-6 hours, max 1200mg/day",
+        "warnings": ["Take with food", "Stomach irritation risk", "Blood pressure effects"],
+        "contraindications": ["stomach ulcers", "kidney disease", "heart conditions"]
+      },
+      {
+        "name": "Aspirin",
+        "active_ingredient": "aspirin",
+        "uses": ["headache", "fever", "inflammation", "heart health"],
+        "general_dosage": "Adults: 325-650mg every 4 hours, max 4000mg/day",
+        "warnings": ["Stomach bleeding risk", "Not for children under 16", "Blood thinning effects"],
+        "contraindications": ["bleeding disorders", "stomach ulcers", "children with viral infections"]
+      }
+    ],
+    "fever_reducers": [
+      {
+        "name": "Acetaminophen (Tylenol)",
+        "active_ingredient": "acetaminophen",
+        "uses": ["fever reduction", "pain relief"],
+        "general_dosage": "Adults: 325-650mg every 4-6 hours",
+        "warnings": ["Monitor temperature", "Stay hydrated"],
+        "contraindications": ["liver disease"]
+      },
+      {
+        "name": "Ibuprofen (Advil, Motrin)",
+        "active_ingredient": "ibuprofen",
+        "uses": ["fever reduction", "anti-inflammatory"],
+        "general_dosage": "Adults: 200-400mg every 4-6 hours",
+        "warnings": ["Take with food", "Monitor blood pressure"],
+        "contraindications": ["kidney disease", "heart conditions"]
+      }
+    ],
+    "anti_nausea": [
+      {
+        "name": "Bismuth Subsalicylate (Pepto-Bismol)",
+        "active_ingredient": "bismuth subsalicylate",
+        "uses": ["nausea", "upset stomach", "diarrhea"],
+        "general_dosage": "Adults: 524mg every 30min-1hr as needed, max 4.2g/day",
+        "warnings": ["May darken tongue/stool", "Contains salicylate"],
+        "contraindications": ["aspirin allergy", "bleeding disorders"]
+      },
+      {
+        "name": "Dimenhydrinate (Dramamine)",
+        "active_ingredient": "dimenhydrinate",
+        "uses": ["motion sickness", "nausea", "vomiting"],
+        "general_dosage": "Adults: 50-100mg every 4-6 hours, max 400mg/day",
+        "warnings": ["May cause drowsiness", "Avoid alcohol"],
+        "contraindications": ["glaucoma", "enlarged prostate", "breathing problems"]
+      }
+    ],
+    "cough_suppressants": [
+      {
+        "name": "Dextromethorphan (Robitussin DM)",
+        "active_ingredient": "dextromethorphan",
+        "uses": ["dry cough", "cough suppression"],
+        "general_dosage": "Adults: 10-20mg every 4 hours, max 120mg/day",
+        "warnings": ["For dry cough only", "May cause drowsiness"],
+        "contraindications": ["productive cough", "asthma", "COPD"]
+      }
+    ],
+    "expectorants": [
+      {
+        "name": "Guaifenesin (Mucinex)",
+        "active_ingredient": "guaifenesin",
+        "uses": ["productive cough", "chest congestion", "mucus thinning"],
+        "general_dosage": "Adults: 200-400mg every 4 hours, max 2400mg/day",
+        "warnings": ["Drink plenty of fluids", "For productive cough"],
+        "contraindications": ["persistent cough with excessive mucus"]
+      }
+    ],
+    "decongestants": [
+      {
+        "name": "Pseudoephedrine (Sudafed)",
+        "active_ingredient": "pseudoephedrine",
+        "uses": ["nasal congestion", "sinus pressure"],
+        "general_dosage": "Adults: 30-60mg every 4-6 hours, max 240mg/day",
+        "warnings": ["May increase blood pressure", "May cause insomnia", "ID required for purchase"],
+        "contraindications": ["high blood pressure", "heart disease", "hyperthyroidism"]
+      },
+      {
+        "name": "Phenylephrine (Sudafed PE)",
+        "active_ingredient": "phenylephrine",
+        "uses": ["nasal congestion", "sinus pressure"],
+        "general_dosage": "Adults: 10mg every 4 hours, max 60mg/day",
+        "warnings": ["May increase blood pressure", "Less effective than pseudoephedrine"],
+        "contraindications": ["severe high blood pressure", "heart disease"]
+      }
+    ],
+    "antihistamines": [
+      {
+        "name": "Diphenhydramine (Benadryl)",
+        "active_ingredient": "diphenhydramine",
+        "uses": ["allergies", "itching", "runny nose", "sleep aid"],
+        "general_dosage": "Adults: 25-50mg every 4-6 hours, max 300mg/day",
+        "warnings": ["Causes drowsiness", "Avoid alcohol", "Anticholinergic effects"],
+        "contraindications": ["glaucoma", "enlarged prostate", "breathing problems"]
+      },
+      {
+        "name": "Loratadine (Claritin)",
+        "active_ingredient": "loratadine",
+        "uses": ["seasonal allergies", "runny nose", "sneezing"],
+        "general_dosage": "Adults: 10mg once daily",
+        "warnings": ["Non-drowsy formula", "May take several days for full effect"],
+        "contraindications": ["liver disease"]
+      },
+      {
+        "name": "Cetirizine (Zyrtec)",
+        "active_ingredient": "cetirizine",
+        "uses": ["allergies", "hives", "itching"],
+        "general_dosage": "Adults: 5-10mg once daily",
+        "warnings": ["May cause mild drowsiness", "Fast-acting"],
+        "contraindications": ["kidney disease", "liver disease"]
+      }
+    ],
+    "antacids": [
+      {
+        "name": "Calcium Carbonate (Tums)",
+        "active_ingredient": "calcium carbonate",
+        "uses": ["heartburn", "acid indigestion", "calcium supplement"],
+        "general_dosage": "Adults: 500-1500mg as needed, max 7500mg/day",
+        "warnings": ["May cause constipation", "Drug interactions"],
+        "contraindications": ["kidney stones", "high calcium levels"]
+      },
+      {
+        "name": "Famotidine (Pepcid AC)",
+        "active_ingredient": "famotidine",
+        "uses": ["heartburn", "acid indigestion", "acid reduction"],
+        "general_dosage": "Adults: 10-20mg twice daily, max 40mg/day",
+        "warnings": ["Take 15-60min before eating", "Longer-acting than antacids"],
+        "contraindications": ["kidney disease"]
+      }
+    ],
+    "antidiarrheals": [
+      {
+        "name": "Loperamide (Imodium)",
+        "active_ingredient": "loperamide",
+        "uses": ["diarrhea", "loose stools"],
+        "general_dosage": "Adults: 2mg after each loose stool, max 8mg/day",
+        "warnings": ["Do not use with bloody stool", "Do not use with fever"],
+        "contraindications": ["bloody diarrhea", "fever", "bacterial infections"]
+      }
+    ],
+    "topical_pain_relief": [
+      {
+        "name": "Capsaicin Cream",
+        "active_ingredient": "capsaicin",
+        "uses": ["muscle pain", "arthritis", "nerve pain"],
+        "general_dosage": "Apply thin layer 2-4 times daily",
+        "warnings": ["May cause burning sensation", "Wash hands after use", "Avoid eyes/mucous membranes"],
+        "contraindications": ["broken skin", "open wounds"]
+      },
+      {
+        "name": "Menthol (Ben-Gay, Icy Hot)",
+        "active_ingredient": "menthol",
+        "uses": ["muscle pain", "minor aches", "cooling effect"],
+        "general_dosage": "Apply to affected area 2-4 times daily",
+        "warnings": ["For external use only", "May cause skin irritation"],
+        "contraindications": ["broken skin", "children under 2"]
+      }
+    ]
+  }

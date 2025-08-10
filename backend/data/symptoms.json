@@ -1,0 +1,137 @@
+{
+    "symptoms": {
+      "headache": {
+        "id": "headache",
+        "name": "Headache",
+        "severity_scale": [1, 2, 3, 4, 5],
+        "follow_up_questions": [
+          "How would you rate your headache pain on a scale of 1-10?",
+          "Where exactly is the pain located? (forehead, temples, back of head, etc.)",
+          "When did the headache start?",
+          "Have you experienced any nausea or vomiting?",
+          "Do you have any vision changes or sensitivity to light?",
+          "Have you taken any medications for the pain?"
+        ],
+        "red_flags": [
+          "sudden severe headache",
+          "headache with fever and neck stiffness",
+          "headache with vision changes",
+          "worst headache of life",
+          "headache after head injury"
+        ],
+        "common_causes": ["tension", "migraine", "sinus", "dehydration", "stress"],
+        "urgency_factors": {
+          "high": ["sudden onset", "severe pain (8-10)", "neurological symptoms", "fever with neck stiffness"],
+          "medium": ["moderate pain (5-7)", "persistent for days", "affecting daily activities"],
+          "low": ["mild pain (1-4)", "occasional", "responds to over-the-counter medication"]
+        }
+      },
+      "fever": {
+        "id": "fever",
+        "name": "Fever",
+        "severity_scale": ["low-grade", "moderate", "high"],
+        "follow_up_questions": [
+          "What is your current temperature?",
+          "How long have you had the fever?",
+          "Are you experiencing chills or sweating?",
+          "Do you have any other symptoms like cough, sore throat, or body aches?",
+          "Have you traveled recently or been exposed to anyone who was sick?",
+          "Are you taking any medications to reduce the fever?"
+        ],
+        "red_flags": [
+          "temperature over 103°F (39.4°C)",
+          "fever with severe headache and neck stiffness",
+          "fever with difficulty breathing",
+          "fever with persistent vomiting",
+          "fever lasting more than 3 days"
+        ],
+        "common_causes": ["viral infection", "bacterial infection", "inflammatory condition"],
+        "urgency_factors": {
+          "high": ["temperature >103°F", "difficulty breathing", "severe dehydration", "immunocompromised"],
+          "medium": ["temperature 101-103°F", "persistent for 2-3 days", "moderate dehydration"],
+          "low": ["temperature <101°F", "recent onset", "mild associated symptoms"]
+        }
+      },
+      "chest_pain": {
+        "id": "chest_pain",
+        "name": "Chest Pain",
+        "severity_scale": [1, 2, 3, 4, 5],
+        "follow_up_questions": [
+          "How would you describe the pain? (sharp, crushing, burning, aching)",
+          "Where exactly in your chest do you feel the pain?",
+          "Does the pain spread to your arms, neck, jaw, or back?",
+          "Does the pain get worse with breathing, movement, or exertion?",
+          "Are you experiencing shortness of breath?",
+          "Do you have any nausea, sweating, or dizziness?",
+          "How long has the pain been present?"
+        ],
+        "red_flags": [
+          "crushing chest pain",
+          "pain radiating to arm or jaw",
+          "shortness of breath",
+          "sweating and nausea",
+          "pain with exertion"
+        ],
+        "common_causes": ["muscle strain", "acid reflux", "anxiety", "heart condition", "lung issue"],
+        "urgency_factors": {
+          "high": ["crushing pain", "radiation to arm/jaw", "shortness of breath", "sweating", "cardiac history"],
+          "medium": ["sharp pain with breathing", "moderate intensity", "associated with movement"],
+          "low": ["muscle-related", "brief episodes", "responds to position change"]
+        }
+      },
+      "nausea": {
+        "id": "nausea",
+        "name": "Nausea",
+        "severity_scale": ["mild", "moderate", "severe"],
+        "follow_up_questions": [
+          "Are you actually vomiting or just feeling nauseous?",
+          "When did the nausea start?",
+          "What were you doing or eating before it started?",
+          "Do you have any abdominal pain or cramping?",
+          "Are you running a fever?",
+          "Are you able to keep fluids down?",
+          "Have you had any recent travel or dietary changes?"
+        ],
+        "red_flags": [
+          "severe abdominal pain",
+          "blood in vomit",
+          "signs of dehydration",
+          "fever with vomiting",
+          "inability to keep fluids down for 24+ hours"
+        ],
+        "common_causes": ["food poisoning", "viral gastroenteritis", "motion sickness", "medication side effect", "stress"],
+        "urgency_factors": {
+          "high": ["blood in vomit", "severe dehydration", "severe abdominal pain", "high fever"],
+          "medium": ["persistent vomiting", "moderate dehydration", "unable to eat for 24+ hours"],
+          "low": ["mild nausea", "recent onset", "able to keep fluids down"]
+        }
+      },
+      "cough": {
+        "id": "cough",
+        "name": "Cough",
+        "severity_scale": ["dry", "productive", "severe"],
+        "follow_up_questions": [
+          "Is your cough dry or are you bringing up mucus/phlegm?",
+          "What color is the mucus? (clear, yellow, green, blood-tinged)",
+          "How long have you had the cough?",
+          "Do you have fever, chest pain, or shortness of breath?",
+          "Is the cough worse at night or during certain activities?",
+          "Do you smoke or have you been exposed to irritants?",
+          "Have you recently had a cold or respiratory infection?"
+        ],
+        "red_flags": [
+          "coughing up blood",
+          "severe shortness of breath",
+          "high fever with cough",
+          "chest pain with cough",
+          "wheezing or difficulty breathing"
+        ],
+        "common_causes": ["viral infection", "bacterial infection", "allergies", "asthma", "acid reflux"],
+        "urgency_factors": {
+          "high": ["blood in sputum", "severe breathing difficulty", "high fever", "chest pain"],
+          "medium": ["productive cough with colored sputum", "persistent for weeks", "mild breathing difficulty"],
+          "low": ["dry cough", "recent onset", "no fever or breathing issues"]
+        }
+      }
+    }
+  }
