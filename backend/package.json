@@ -6,6 +6,9 @@
   "scripts": {
     "start": "node backend/server.js",
     "dev": "nodemon backend/server.js",
+    "enhance-data": "node scripts/enhance-all-data.js",
+    "enhance-conditions": "node scripts/enhance-conditions.js", 
+    "enhance-medications": "node scripts/enhance-medications.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

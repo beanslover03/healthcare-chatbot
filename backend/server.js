@@ -6,7 +6,7 @@ require('dotenv').config();
 
 // Import services
 const ClaudeService = require('./services/claude-service');
-const MedicalAPIService = require('./services/medical-api');
+const MedicalAPIService = require('./services/medical-apis/index');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
