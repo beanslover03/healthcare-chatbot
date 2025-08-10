@@ -30,8 +30,31 @@ app.get('/', (req, res) => {
 // Simple conversation storage
 const conversationSessions = new Map();
 
+// Input validation middleware
+function validateInput(req, res, next) {
+    const { message } = req.body;
+    
+    if (!message || typeof message !== 'string' || message.trim().length === 0) {
+        return res.json({
+            success: false,
+            response: 'Please provide a valid message describing your symptoms.'
+        });
+    }
+    
+    if (message.length > 1000) {
+        return res.json({
+            success: false,
+            response: 'Please keep your message under 1000 characters for better analysis.'
+        });
+    }
+    
+    // Clean up the message
+    req.body.message = message.trim();
+    next();
+}
+
 // Enhanced chat endpoint that handles both chat and symptom tracker requests
-app.post('/api/chat', async (req, res) => {
+app.post('/api/chat', validateInput, async (req, res) => {
     try {
         const { message, sessionId = 'default', source = 'chat' } = req.body;
         
@@ -98,28 +121,37 @@ app.post('/api/chat', async (req, res) => {
 
     } catch (error) {
         console.error('💥 Chat error:', error);
+        
+        // Provide helpful fallback based on error type
+        let fallbackResponse = "I'm having trouble right now. For urgent medical concerns, please contact your healthcare provider or call 911.";
+        
+        if (error.message.includes('API key')) {
+            fallbackResponse = "I'm experiencing technical difficulties. Please consult a healthcare professional directly for medical concerns.";
+        }
+        
         res.json({
             success: false,
-            response: "I'm having trouble right now. For urgent medical concerns, please contact your healthcare provider or call 911.",
-            error: error.message
+            response: fallbackResponse,
+            error: error.message,
+            emergencyContact: "If this is an emergency, call 911"
         });
     }
 });
 
-// Enhanced symptom tracker analysis
 async function handleSymptomTrackerAnalysis(message, history) {
     try {
-        // Use Claude to provide structured medical analysis
-        const prompt = `The user has described their symptoms: "${message}"
+        // Enhanced prompt that uses your medical data structure
+        const prompt = `The user described symptoms: "${message}"
 
-Please provide a helpful medical assessment that includes:
-1. A brief acknowledgment of their symptoms
-2. Urgency level assessment (low, medium, or high priority)
-3. Recommended immediate actions
-4. When to seek medical care
-5. Self-care suggestions if appropriate
+As a medical assistant, provide a structured assessment:
 
-Keep the response conversational but informative, and always remind them that this is guidance, not a diagnosis.`;
+1. **Symptom Recognition**: What symptoms do you identify?
+2. **Urgency Level**: Rate as LOW, MEDIUM, or HIGH priority
+3. **Immediate Actions**: What should they do right now?
+4. **When to Seek Care**: Clear guidance on when to see a doctor
+5. **Self-Care**: Safe self-care suggestions if appropriate
+
+Important: Always emphasize this is guidance, not diagnosis. Be especially cautious with chest pain, breathing issues, or severe symptoms.`;
 
         const response = await claudeService.getChatResponse(prompt, history);
         return response;

@@ -4,9 +4,15 @@ const Anthropic = require('@anthropic-ai/sdk');
 class ClaudeService {
     constructor() {
         this.anthropic = new Anthropic({
-            apiKey: process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY
+            apiKey: process.env.ANTHROPIC_API_KEY
         });
         
+        this.medicalData = {
+            conditions: require('../data/conditions.json'),
+            symptoms: require('../data/symptoms.json'),
+            medications: require('../data/otc-medications.json')
+        };
+
         // FIXED: Much simpler, more conversational system prompts
         this.systemPrompts = {
             conversational: `You are a warm, helpful medical assistant having natural conversations.
@@ -80,12 +86,25 @@ Remember: Users want understanding and quick help, not medical lectures.`,
 
     // FIXED: Simple emergency detection  
     isEmergency(userMessage) {
+        const messageLower = userMessage.toLowerCase();
+        
+        // Use your emergency conditions data
+        const emergencyConditions = this.medicalData.conditions.emergency_conditions;
+        
+        for (const [conditionId, condition] of Object.entries(emergencyConditions)) {
+            for (const symptom of condition.symptoms) {
+                if (messageLower.includes(symptom.toLowerCase())) {
+                    return true;
+                }
+            }
+        }
+        
+        // Keep existing simple keywords as backup
         const emergencyKeywords = [
             'can\'t breathe', 'crushing chest', 'call 911', 'emergency',
             'severe chest pain', 'worst headache ever', 'losing consciousness'
         ];
         
-        const messageLower = userMessage.toLowerCase();
         return emergencyKeywords.some(keyword => messageLower.includes(keyword));
     }
 
