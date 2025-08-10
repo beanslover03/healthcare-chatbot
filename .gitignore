@@ -1,3 +1,4 @@
+# Existing entries
 node_modules/
 .env
 *.log
@@ -6,7 +7,23 @@ dist/
 build/
 coverage/
 .vscode/
-.next/
-.nuxt/
-*.tmp
-*.temp
+
+# Python virtual environment
+venv/
+env/
+ENV/
+.venv/
+.env/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+
+# Python packages
+*.egg-info/
+dist/
+build/
