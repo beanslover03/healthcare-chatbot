@@ -1,3 +1,4 @@
+// server.js - Updated for unified interface
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
@@ -6,7 +7,6 @@ require('dotenv').config();
 // Import services
 const ClaudeService = require('./services/claude-service');
 const MedicalAPIService = require('./services/medical-api');
-const SymptomAssessor = require('./symptom_logic');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -14,81 +14,85 @@ const PORT = process.env.PORT || 3000;
 // Initialize services
 const claudeService = new ClaudeService();
 const medicalAPI = new MedicalAPIService();
-const symptomAssessor = new SymptomAssessor();
-
-// Initialize symptom assessor
-symptomAssessor.initialize().catch(console.error);
 
 // Middleware
 app.use(cors());
 app.use(express.json());
+
+// Serve the unified interface instead of the old one
 app.use(express.static(path.join(__dirname, '../frontend')));
 
-// Simple conversation storage (for Claude context only)
+// Override the main route to serve our unified interface
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'unified-interface.html'));
+});
+
+// Simple conversation storage
 const conversationSessions = new Map();
 
-// FIXED: Integrated approach - SymptomAssessor determines WHAT to do, Claude determines HOW to say it
+// Enhanced chat endpoint that handles both chat and symptom tracker requests
 app.post('/api/chat', async (req, res) => {
     try {
-        const { message, sessionId = 'default' } = req.body;
+        const { message, sessionId = 'default', source = 'chat' } = req.body;
         
-        console.log(`💬 Processing: "${message}" (Session: ${sessionId})`);
+        console.log(`💬 ${source.toUpperCase()}: "${message}"`);
         
-        // Get Claude conversation history
+        // Get conversation history
         if (!conversationSessions.has(sessionId)) {
             conversationSessions.set(sessionId, []);
         }
-        const claudeHistory = conversationSessions.get(sessionId);
+        const history = conversationSessions.get(sessionId);
 
-        // Step 1: Let SymptomAssessor analyze the medical situation
-        const assessmentResult = await symptomAssessor.assessSymptoms(message, sessionId);
-        console.log(`🔍 Assessment type: ${assessmentResult.type}`);
+        let response;
+        let urgency = 'normal';
 
-        // Step 2: Use Claude to generate natural responses based on the assessment
-        let finalResponse;
-        let urgencyLevel = 'normal';
-
-        switch (assessmentResult.type) {
-            case 'emergency':
-                finalResponse = await generateEmergencyResponse(assessmentResult, claudeService, claudeHistory);
-                urgencyLevel = 'emergency';
-                break;
+        // Handle different sources
+        if (source === 'symptom_tracker') {
+            // For symptom tracker, provide more structured analysis
+            response = await handleSymptomTrackerAnalysis(message, history);
+            urgency = determineUrgencyFromResponse(response);
+        } else {
+            // Regular chat flow
+            if (claudeService.isEmergency(message)) {
+                console.log('🚨 Emergency detected');
+                response = await claudeService.generateEmergencyResponse(message, history);
+                urgency = 'emergency';
                 
-            case 'question':
-                finalResponse = await generateNaturalQuestion(assessmentResult, claudeService, message, claudeHistory);
-                urgencyLevel = 'gathering_info';
-                break;
+            } else if (claudeService.isConversationEnding(message)) {
+                console.log('👋 Conversation ending');
+                response = await claudeService.generateEndingResponse(history);
+                urgency = 'ending';
                 
-            case 'assessment':
-                finalResponse = await generateAssessmentResponse(assessmentResult, claudeService, claudeHistory);
-                urgencyLevel = assessmentResult.urgency || 'normal';
-                break;
-                
-            default: // clarification
-                finalResponse = await generateClarificationResponse(claudeService, message, claudeHistory);
-                urgencyLevel = 'clarification';
+            } else {
+                console.log('💭 Normal conversation');
+                response = await claudeService.getChatResponse(
+                    `User said: "${message}". Respond naturally and helpfully as a medical assistant.`,
+                    history
+                );
+            }
         }
 
-        // Step 3: Update Claude conversation history for context
-        claudeHistory.push(
+        // Update history
+        history.push(
             { role: "user", content: message },
-            { role: "assistant", content: finalResponse }
+            { role: "assistant", content: response }
         );
 
         // Keep history manageable
-        if (claudeHistory.length > 20) {
-            claudeHistory.splice(0, claudeHistory.length - 20);
+        if (history.length > 10) {
+            history.splice(0, history.length - 10);
         }
 
-        conversationSessions.set(sessionId, claudeHistory);
+        conversationSessions.set(sessionId, history);
 
-        // Step 4: Send response
+        console.log(`🤖 Response: "${response}"`);
+
         res.json({
             success: true,
-            response: finalResponse,
-            urgency: urgencyLevel,
+            response: response,
+            urgency: urgency,
             sessionId: sessionId,
-            assessmentType: assessmentResult.type,
+            source: source,
             timestamp: new Date().toISOString()
         });
 
@@ -102,236 +106,200 @@ app.post('/api/chat', async (req, res) => {
     }
 });
 
-// Generate emergency response using Claude
-async function generateEmergencyResponse(assessmentResult, claudeService, claudeHistory) {
-    const prompt = `
-    EMERGENCY SITUATION DETECTED
-    Risk factors: ${assessmentResult.emergencyRisk.factors.join(', ')}
-    Risk score: ${assessmentResult.emergencyRisk.riskScore}/10
-    
-    Generate a clear, calm but urgent response that:
-    1. Acknowledges their serious symptoms
-    2. Recommends immediate medical attention (911 or ER)
-    3. Doesn't cause panic but conveys urgency
-    4. Is supportive and professional
-    
-    Keep it 2-3 sentences maximum.
-    `;
-
+// Enhanced symptom tracker analysis
+async function handleSymptomTrackerAnalysis(message, history) {
     try {
-        const response = await claudeService.getChatResponse(prompt, claudeHistory.slice(-2));
-        return `🚨 ${response}`;
+        // Use Claude to provide structured medical analysis
+        const prompt = `The user has described their symptoms: "${message}"
+
+Please provide a helpful medical assessment that includes:
+1. A brief acknowledgment of their symptoms
+2. Urgency level assessment (low, medium, or high priority)
+3. Recommended immediate actions
+4. When to seek medical care
+5. Self-care suggestions if appropriate
+
+Keep the response conversational but informative, and always remind them that this is guidance, not a diagnosis.`;
+
+        const response = await claudeService.getChatResponse(prompt, history);
+        return response;
+        
     } catch (error) {
-        return `🚨 I'm concerned about the symptoms you're describing. These can be serious and I'd recommend calling 911 or getting immediate medical attention right away.`;
+        console.error('Symptom tracker analysis error:', error);
+        return "I'm having trouble analyzing your symptoms right now. Please consider contacting a healthcare professional, especially if your symptoms are severe or concerning.";
     }
 }
 
-// Generate natural follow-up questions using Claude
-async function generateNaturalQuestion(assessmentResult, claudeService, userMessage, claudeHistory) {
-    const symptomAssessorQuestion = assessmentResult.question.question;
-    const questionType = assessmentResult.question.type;
-    const focusSymptom = assessmentResult.question.focus;
-
-    const prompt = `
-    USER SAID: "${userMessage}"
+// Determine urgency from Claude's response
+function determineUrgencyFromResponse(response) {
+    const responseLower = response.toLowerCase();
     
-    I need to ask about: ${questionType} for their ${focusSymptom.replace('_', ' ')}
-    
-    Original question: "${symptomAssessorQuestion}"
-    
-    Make this question more natural and conversational:
-    1. First acknowledge what they told me
-    2. Then ask the question in a caring, natural way
-    3. Briefly explain why this helps (1 sentence)
-    4. Keep the overall response to 2-3 sentences
-    5. Don't ask if they've already mentioned this information
-    
-    Previous conversation context: ${claudeHistory.slice(-4).map(h => h.content).join('\n')}
-    `;
-
-    try {
-        const response = await claudeService.getChatResponse(prompt, []);
-        return response;
-    } catch (error) {
-        // Fallback to assessor's question
-        return `I understand you're experiencing ${focusSymptom.replace('_', ' ')}. ${symptomAssessorQuestion} This helps me better understand your situation.`;
+    if (responseLower.includes('emergency') || 
+        responseLower.includes('call 911') || 
+        responseLower.includes('immediate medical attention')) {
+        return 'emergency';
     }
+    
+    if (responseLower.includes('see a doctor') || 
+        responseLower.includes('healthcare provider') || 
+        responseLower.includes('urgent care') ||
+        responseLower.includes('contact your doctor')) {
+        return 'high';
+    }
+    
+    if (responseLower.includes('monitor') || 
+        responseLower.includes('watch for') || 
+        responseLower.includes('if symptoms worsen')) {
+        return 'medium';
+    }
+    
+    return 'low';
 }
 
-// Generate comprehensive assessment response using Claude
-async function generateAssessmentResponse(assessmentResult, claudeService, claudeHistory) {
-    const symptoms = Array.from(assessmentResult.symptoms.keys()).join(', ');
-    const urgency = assessmentResult.urgency;
-    const conditions = assessmentResult.potentialConditions?.map(c => c.name).slice(0, 2).join(', ') || 'various conditions';
-
-    const prompt = `
-    MEDICAL ASSESSMENT COMPLETE
+// New endpoint for getting user service preferences
+app.get('/api/user-preferences/:sessionId', (req, res) => {
+    const sessionId = req.params.sessionId;
+    const history = conversationSessions.get(sessionId) || [];
     
-    User's symptoms: ${symptoms}
-    Urgency level: ${urgency}
-    Possible conditions: ${conditions}
+    // Analyze user's interaction pattern to suggest the best service
+    let suggestedService = 'chat';
+    let reason = 'Great for detailed conversations about your symptoms';
     
-    Generate a helpful, conversational response that:
-    1. Acknowledges their specific symptoms
-    2. Provides appropriate guidance based on urgency:
-       - High: Contact healthcare provider today/urgent care
-       - Medium: Monitor and contact if worsens, routine appointment
-       - Low: Self-care suggestions, monitor symptoms
-    3. Gives 1-2 practical next steps they can take
-    4. Offers to answer questions or provide more information
-    5. Remains supportive and non-alarming
-    
-    Keep it conversational and helpful (3-4 sentences).
-    Don't list multiple conditions - focus on most helpful guidance.
-    `;
-
-    try {
-        const response = await claudeService.getChatResponse(prompt, claudeHistory.slice(-2));
-        return response;
-    } catch (error) {
-        // Enhanced fallback
-        if (urgency === 'high') {
-            return `Based on your ${symptoms}, I'd recommend contacting your healthcare provider today to get this properly evaluated. These symptoms warrant prompt medical attention. Is there anything specific you'd like to know while you arrange to see a healthcare professional?`;
-        } else if (urgency === 'medium') {
-            return `Your ${symptoms} sound concerning but manageable. I'd suggest monitoring these symptoms and contacting your healthcare provider if they worsen or don't improve. Would you like some suggestions for what might help in the meantime?`;
-        } else {
-            return `Your ${symptoms} sound like something you can manage with some self-care, but keep monitoring how you feel. Would you like some suggestions for relief, or do you have questions about when to seek care?`;
+    if (history.length === 0) {
+        // New user - suggest based on typical use cases
+        suggestedService = 'chat';
+        reason = 'Start with our chat assistant for personalized guidance';
+    } else {
+        // Analyze conversation history
+        const recentMessages = history.slice(-6);
+        const hasMultipleSymptoms = recentMessages.some(msg => 
+            (msg.content.match(/and|also|plus|,/g) || []).length > 2
+        );
+        
+        if (hasMultipleSymptoms) {
+            suggestedService = 'tracker';
+            reason = 'The symptom tracker might help organize multiple symptoms better';
         }
     }
-}
-
-// Generate clarification request using Claude  
-async function generateClarificationResponse(claudeService, userMessage, claudeHistory) {
-    const prompt = `
-    USER MESSAGE: "${userMessage}"
     
-    This user contacted a medical chatbot but hasn't clearly described symptoms yet.
-    
-    Generate a warm, encouraging response that:
-    1. Shows you're ready to help with their health concerns
-    2. Asks them to describe their symptoms naturally
-    3. Gives a brief example of what's helpful
-    4. Keeps it friendly and approachable (2 sentences)
-    
-    Recent conversation: ${claudeHistory.slice(-2).map(h => h.content).join('\n')}
-    `;
-
-    try {
-        const response = await claudeService.getChatResponse(prompt, []);
-        return response;
-    } catch (error) {
-        return "Hi! I'm here to help you understand your health concerns. Could you tell me what symptoms you're experiencing and when they started?";
-    }
-}
-
-// Medication lookup (unchanged)
-app.post('/api/medication-lookup', async (req, res) => {
-    try {
-        const { medicationName, userContext = '' } = req.body;
-        
-        const medicationData = await medicalAPI.comprehensiveMedicationLookup(medicationName);
-        
-        const prompt = `The user is asking about "${medicationName}". Context: ${userContext}
-        
-        Available data: ${JSON.stringify(medicationData, null, 2)}
-        
-        Provide helpful information about this medication in a conversational way. Include key uses, safety notes, and remind them to consult their pharmacist or doctor.`;
-
-        const response = await claudeService.getChatResponse(prompt, []);
-        
-        res.json({
-            success: true,
-            response: response,
-            medication: medicationName
-        });
-
-    } catch (error) {
-        console.error('Medication lookup error:', error);
-        res.json({
-            success: false,
-            response: `I'd recommend speaking with your pharmacist or healthcare provider about ${req.body.medicationName} for the most accurate information.`
-        });
-    }
+    res.json({
+        sessionId,
+        suggestedService,
+        reason,
+        conversationLength: history.length
+    });
 });
 
-// Enhanced session context endpoint
+// Enhanced session management
 app.get('/api/session/:sessionId/context', (req, res) => {
     const sessionId = req.params.sessionId;
+    const history = conversationSessions.get(sessionId) || [];
     
-    try {
-        // Get both symptom assessor and Claude context
-        const symptomSession = symptomAssessor.getUserSession(sessionId);
-        const claudeHistory = conversationSessions.get(sessionId) || [];
-        
-        res.json({
-            sessionId: sessionId,
-            symptomAssessor: {
-                reportedSymptoms: Object.fromEntries(symptomSession.reportedSymptoms || new Map()),
-                currentFocus: symptomSession.currentFocus,
-                assessmentStage: symptomSession.assessmentStage,
-                riskScore: symptomSession.riskScore,
-                conversationLength: symptomSession.conversationHistory?.length || 0
-            },
-            claude: {
-                conversationLength: claudeHistory.length,
-                lastMessages: claudeHistory.slice(-4)
-            }
-        });
-    } catch (error) {
-        res.json({
-            sessionId: sessionId,
-            error: 'Could not retrieve session data',
-            message: error.message
-        });
-    }
+    // Extract symptoms mentioned in conversation
+    const symptoms = [];
+    const urgencyKeywords = [];
+    
+    history.forEach(msg => {
+        if (msg.role === 'user') {
+            // Simple symptom extraction
+            const content = msg.content.toLowerCase();
+            if (content.includes('headache') || content.includes('head')) symptoms.push('headache');
+            if (content.includes('fever') || content.includes('hot')) symptoms.push('fever');
+            if (content.includes('nausea') || content.includes('sick')) symptoms.push('nausea');
+            if (content.includes('chest') || content.includes('heart')) symptoms.push('chest_pain');
+            if (content.includes('cough')) symptoms.push('cough');
+            if (content.includes('tired') || content.includes('fatigue')) symptoms.push('fatigue');
+            
+            // Urgency indicators
+            if (content.includes('severe') || content.includes('terrible')) urgencyKeywords.push('severe');
+            if (content.includes('emergency') || content.includes('911')) urgencyKeywords.push('emergency');
+        }
+    });
+    
+    res.json({
+        sessionId: sessionId,
+        messageCount: history.length,
+        symptoms: [...new Set(symptoms)],
+        urgencyIndicators: [...new Set(urgencyKeywords)],
+        lastMessages: history.slice(-4),
+        summary: generateSessionSummary(history)
+    });
 });
 
-// Enhanced session reset
-app.delete('/api/session/:sessionId', (req, res) => {
-    const sessionId = req.params.sessionId;
-    
-    // Clear both systems
-    try {
-        symptomAssessor.userSessions.delete(sessionId);
-    } catch (error) {
-        console.log('Error clearing symptom assessor session:', error);
+function generateSessionSummary(history) {
+    if (history.length === 0) {
+        return "No conversation yet";
     }
     
+    const userMessages = history.filter(msg => msg.role === 'user').length;
+    const hasSymptoms = history.some(msg => 
+        msg.content.toLowerCase().match(/(pain|hurt|sick|fever|headache|nausea|cough)/g)
+    );
+    
+    if (userMessages === 1) {
+        return hasSymptoms ? "Discussed initial symptoms" : "Started conversation";
+    } else if (userMessages < 5) {
+        return hasSymptoms ? "Exploring symptoms in detail" : "Having initial discussion";
+    } else {
+        return "Detailed conversation about health concerns";
+    }
+}
+
+// Service usage analytics
+app.get('/api/analytics/service-usage', (req, res) => {
+    // This would track which services users prefer
+    // For now, return sample data
+    res.json({
+        totalSessions: conversationSessions.size,
+        services: {
+            chat: {
+                usage: 75,
+                avgSessionLength: 8.5,
+                userSatisfaction: 4.2
+            },
+            symptomTracker: {
+                usage: 25,
+                avgSessionLength: 3.2,
+                userSatisfaction: 4.0
+            }
+        },
+        recommendations: [
+            "Most users start with chat for initial guidance",
+            "Symptom tracker is preferred for multiple symptoms",
+            "Users switch between services during complex consultations"
+        ]
+    });
+});
+
+// Clear session
+app.delete('/api/session/:sessionId', (req, res) => {
+    const sessionId = req.params.sessionId;
     conversationSessions.delete(sessionId);
-    claudeService.clearConversationContext(sessionId);
     
     res.json({ 
-        message: `Session ${sessionId} cleared completely. Fresh conversation started.`,
+        message: `Session ${sessionId} cleared. You can start fresh with either service.`,
         timestamp: new Date().toISOString()
     });
 });
 
-// Health check with integration status
+// Health check
 app.get('/api/health', async (req, res) => {
     try {
         const claudeHealth = await claudeService.healthCheck();
-        const apiStatus = medicalAPI.getAPIStatus();
-        const symptomAssessorStatus = symptomAssessor.symptoms ? 'ready' : 'initializing';
         
         res.json({
             status: 'healthy',
             timestamp: new Date().toISOString(),
-            architecture: 'integrated_symptom_assessor_claude',
             services: {
                 claude: claudeHealth,
-                medical_apis: apiStatus,
-                symptom_assessor: symptomAssessorStatus,
-                active_sessions: {
-                    symptom_assessor: symptomAssessor.userSessions?.size || 0,
-                    claude: conversationSessions.size
-                }
+                unified_interface: true,
+                active_sessions: conversationSessions.size
             },
             features: {
-                medical_analysis: symptomAssessorStatus === 'ready',
-                natural_responses: claudeHealth.status === 'healthy',
-                emergency_detection: true,
-                conversational_questions: true,
-                integrated_assessment: true
+                chat_assistant: true,
+                symptom_tracker: true,
+                service_switching: true,
+                session_management: true
             }
         });
 
@@ -344,22 +312,31 @@ app.get('/api/health', async (req, res) => {
     }
 });
 
-// Emergency contacts (unchanged)
+// Emergency contacts
 app.get('/api/emergency-contacts', (req, res) => {
     res.json({
         emergency: {
             number: '911',
-            when: 'Life-threatening symptoms: severe chest pain, difficulty breathing, loss of consciousness'
+            description: 'Life-threatening emergencies'
         },
         urgent_care: {
-            description: 'For non-life-threatening but urgent symptoms',
-            when: 'Symptoms that need same-day care but aren\'t emergencies'
+            description: 'Non-life-threatening urgent symptoms',
+            finder: 'Search "urgent care near me"'
         },
-        primary_care: {
-            description: 'Your healthcare provider',
-            when: 'Routine concerns, follow-up questions, medication issues'
+        telehealth: {
+            description: 'Virtual consultations',
+            note: 'Many insurance plans cover telehealth visits'
+        },
+        poison_control: {
+            number: '1-800-222-1222',
+            description: 'Poison emergencies'
         }
     });
+});
+
+// Serve the unified interface file
+app.get('/unified', (req, res) => {
+    res.sendFile(path.join(__dirname, 'unified-interface.html'));
 });
 
 // Error handling
@@ -367,27 +344,41 @@ app.use((error, req, res, next) => {
     console.error('Server error:', error);
     res.status(500).json({
         success: false,
-        response: 'I encountered a technical issue. For urgent medical concerns, please contact a healthcare professional.',
+        response: 'Technical issue occurred. For urgent medical concerns, please contact a healthcare professional.',
         timestamp: new Date().toISOString()
     });
 });
 
-// 404 for API routes
+// 404 handler
 app.use((req, res, next) => {
     if (req.originalUrl.startsWith('/api/')) {
-        res.status(404).json({ error: 'API endpoint not found' });
+        res.status(404).json({ 
+            error: 'API endpoint not found',
+            availableEndpoints: [
+                'POST /api/chat',
+                'GET /api/session/:id/context', 
+                'DELETE /api/session/:id',
+                'GET /api/health',
+                'GET /api/emergency-contacts'
+            ]
+        });
     } else {
+        // Serve the unified interface for any non-API route
         res.sendFile(path.join(__dirname, '../frontend/index.html'));
     }
 });
 
 app.listen(PORT, () => {
-    console.log(`🏥 Medical Chatbot Server (Integrated) running on http://localhost:${PORT}`);
-    console.log('🎯 Architecture: SymptomAssessor (medical logic) + Claude (natural language)');
-    console.log('✅ Integration: SymptomAssessor decides WHAT to do, Claude decides HOW to say it');
-    console.log('🚫 Fixed: Competing conversation managers causing loops');
-    console.log('⚡ Features: Smart questioning, emergency detection, natural responses');
+    console.log(`🏥 Medical Chatbot (UNIFIED) running on http://localhost:${PORT}`);
+    console.log('✅ FEATURES:');
+    console.log('   📱 Unified Interface - Chat + Symptom Tracker');
+    console.log('   🔄 Service Switching - Users choose their preferred method');
+    console.log('   💬 Enhanced Chat - Natural conversation flow');
+    console.log('   📋 Smart Symptom Tracker - Structured symptom analysis');
+    console.log('   📊 Session Analytics - Track user preferences');
+    console.log('   🎯 Contextual Responses - Different analysis for each service');
     console.log(`🔑 Claude API: ${process.env.CLAUDE_API_KEY || process.env.ANTHROPIC_API_KEY ? 'Configured' : 'Missing'}`);
+    console.log(`🌐 Access at: http://localhost:${PORT}`);
 });
 
 module.exports = app;

@@ -14,48 +14,127 @@
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            height: 100vh;
+            min-height: 100vh;
+        }
+
+        .main-container {
             display: flex;
             justify-content: center;
             align-items: center;
+            min-height: 100vh;
+            padding: 20px;
         }
 
-        .chat-container {
-            width: 90%;
-            max-width: 800px;
-            height: 80vh;
+        .app-container {
+            width: 100%;
+            max-width: 1000px;
             background: white;
             border-radius: 20px;
             box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
             display: flex;
             flex-direction: column;
-            overflow: hidden;
+            height: 90vh;
+            max-height: 900px;
         }
 
-        .chat-header {
+        /* Header */
+        .app-header {
             background: linear-gradient(135deg, #2196f3, #1976d2);
             color: white;
             padding: 20px;
             text-align: center;
         }
 
-        .chat-header h1 {
+        .app-header h1 {
             font-size: 24px;
             margin-bottom: 5px;
         }
 
-        .chat-header p {
+        .app-header p {
             font-size: 14px;
             opacity: 0.9;
         }
 
+        /* Service Selector */
+        .service-selector {
+            display: flex;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .service-tab {
+            flex: 1;
+            padding: 15px 20px;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+            color: #666;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .service-tab:hover {
+            background: #e3f2fd;
+            color: #2196f3;
+        }
+
+        .service-tab.active {
+            color: #2196f3;
+            background: white;
+        }
+
+        .service-tab.active::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: #2196f3;
+        }
+
+        .service-tab .icon {
+            display: block;
+            font-size: 20px;
+            margin-bottom: 5px;
+        }
+
+        /* Content Area */
+        .content-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .service-content {
+            flex: 1;
+            display: none;
+            flex-direction: column;
+        }
+
+        .service-content.active {
+            display: flex;
+        }
+
+        /* Chat Interface */
+        .chat-interface {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
         .disclaimer {
             background: #fff3cd;
-            border: 1px solid #ffeaa7;
+            border-bottom: 1px solid #ffeaa7;
             color: #856404;
             padding: 10px 20px;
             font-size: 12px;
             text-align: center;
+            flex-shrink: 0; /* Prevent disclaimer from shrinking */
         }
 
         .chat-messages {
@@ -63,6 +142,27 @@
             padding: 20px;
             overflow-y: auto;
             background: #f8f9fa;
+            min-height: 0; /* Critical: allows flex item to shrink below content size */
+            max-height: calc(100vh - 400px); /* Ensure it doesn't exceed viewport */
+        }
+
+        /* Custom scrollbar for chat messages */
+        .chat-messages::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .chat-messages::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+
+        .chat-messages::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 4px;
+        }
+
+        .chat-messages::-webkit-scrollbar-thumb:hover {
+            background: #a1a1a1;
         }
 
         .message {
@@ -86,6 +186,7 @@
             color: white;
             font-weight: bold;
             font-size: 14px;
+            flex-shrink: 0; /* Prevent avatar from shrinking */
         }
 
         .message.user .message-avatar {
@@ -101,6 +202,7 @@
             padding: 12px 16px;
             border-radius: 18px;
             word-wrap: break-word;
+            line-height: 1.4;
         }
 
         .message.user .message-content {
@@ -149,6 +251,30 @@
             padding: 20px;
             background: white;
             border-top: 1px solid #e0e0e0;
+            flex-shrink: 0; /* Prevent input area from shrinking */
+        }
+
+        .quick-options {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+
+        .quick-option {
+            padding: 8px 16px;
+            background: #f0f0f0;
+            border: 1px solid #ddd;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        .quick-option:hover {
+            background: #e3f2fd;
+            border-color: #2196f3;
+            color: #2196f3;
         }
 
         .chat-input-wrapper {
@@ -187,6 +313,7 @@
             justify-content: center;
             font-size: 20px;
             transition: background 0.3s ease;
+            flex-shrink: 0; /* Prevent button from shrinking */
         }
 
         .send-button:hover {
@@ -198,80 +325,436 @@
             cursor: not-allowed;
         }
 
-        .quick-options {
-            display: flex;
-            gap: 10px;
-            margin-top: 10px;
-            flex-wrap: wrap;
+        /* Symptom Tracker Interface */
+        .symptom-tracker {
+            padding: 20px;
+            overflow-y: auto;
+            height: 100%;
+            max-height: calc(100vh - 200px);
         }
 
-        .quick-option {
-            padding: 8px 16px;
-            background: #f0f0f0;
-            border: 1px solid #ddd;
-            border-radius: 20px;
+        .tracker-section {
+            margin-bottom: 25px;
+        }
+
+        .tracker-section:last-child {
+            margin-bottom: 0;
+        }
+
+        .tracker-section h3 {
+            margin-bottom: 15px;
+            color: #333;
+            font-size: 18px;
+        }
+
+        .symptom-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .symptom-card {
+            background: white;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            padding: 15px;
+            text-align: center;
             cursor: pointer;
-            font-size: 14px;
             transition: all 0.3s ease;
         }
 
-        .quick-option:hover {
-            background: #e3f2fd;
+        .symptom-card:hover {
             border-color: #2196f3;
-            color: #2196f3;
+            background: #f3f8ff;
+        }
+
+        .symptom-card.selected {
+            border-color: #2196f3;
+            background: #e3f2fd;
+        }
+
+        .symptom-card .icon {
+            font-size: 24px;
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        .symptom-card .label {
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .severity-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 12px;
+            margin: 20px 0;
+        }
+
+        .severity-slider {
+            width: 100%;
+            margin: 15px 0;
+            position: relative;
+        }
+
+        .severity-slider input {
+            width: 100%;
+            height: 8px;
+            border-radius: 4px;
+            background: linear-gradient(to right, #4caf50, #ffeb3b, #ff5722);
+            outline: none;
+            -webkit-appearance: none;
+            appearance: none;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .severity-slider input::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: white;
+            border: 3px solid #2196f3;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+            transition: all 0.2s ease;
+        }
+
+        .severity-slider input::-webkit-slider-thumb:hover {
+            transform: scale(1.1);
+            box-shadow: 0 3px 8px rgba(0,0,0,0.3);
+            border-color: #1976d2;
+        }
+
+        .severity-slider input::-webkit-slider-thumb:active {
+            transform: scale(1.2);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+        }
+
+        /* Firefox slider thumb */
+        .severity-slider input::-moz-range-thumb {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: white;
+            border: 3px solid #2196f3;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+            transition: all 0.2s ease;
+        }
+
+        .severity-slider input::-moz-range-thumb:hover {
+            transform: scale(1.1);
+            box-shadow: 0 3px 8px rgba(0,0,0,0.3);
+            border-color: #1976d2;
+        }
+
+        .severity-slider input::-moz-range-track {
+            height: 8px;
+            border-radius: 4px;
+            background: linear-gradient(to right, #4caf50, #ffeb3b, #ff5722);
+            border: none;
+        }
+
+        /* Add visual feedback for the current value */
+        .severity-value-indicator {
+            position: absolute;
+            top: -35px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #2196f3;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            pointer-events: none;
+        }
+
+        .severity-slider:hover .severity-value-indicator,
+        .severity-slider input:focus + .severity-value-indicator {
+            opacity: 1;
+        }
+
+        .severity-labels {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .analyze-button {
+            width: 100%;
+            padding: 15px;
+            background: #2196f3;
+            color: white;
+            border: none;
+            border-radius: 25px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 20px;
+        }
+
+        .analyze-button:hover {
+            background: #1976d2;
+        }
+
+        .analyze-button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        /* Custom scrollbar for symptom tracker */
+        .symptom-tracker::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .symptom-tracker::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+
+        .symptom-tracker::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 4px;
+        }
+
+        .symptom-tracker::-webkit-scrollbar-thumb:hover {
+            background: #a1a1a1;
+        }
+
+        /* Ensure content doesn't get cut off */
+        .results-panel {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 20px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .urgency-badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 15px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-bottom: 15px;
+        }
+
+        .urgency-low { background: #c8e6c9; color: #2e7d32; }
+        .urgency-medium { background: #ffe0b2; color: #f57c00; }
+        .urgency-high { background: #ffcdd2; color: #d32f2f; }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .main-container {
+                padding: 10px;
+            }
+
+            .app-container {
+                height: 95vh;
+                max-height: none;
+            }
+
+            .service-tab {
+                padding: 12px 10px;
+                font-size: 14px;
+            }
+
+            .service-tab .icon {
+                font-size: 18px;
+                margin-bottom: 3px;
+            }
+
+            .symptom-grid {
+                grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+                gap: 10px;
+            }
+
+            .symptom-tracker {
+                padding: 15px;
+                max-height: calc(100vh - 180px);
+            }
+
+            .tracker-section {
+                margin-bottom: 20px;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="chat-container">
-        <div class="chat-header">
-            <h1>🏥 Healthcare AI Assistant</h1>
-            <p>I'm here to help assess your symptoms and provide guidance</p>
-        </div>
-        
-        <div class="disclaimer">
-            ⚠️ This tool provides general information only and is not a substitute for professional medical advice. Always consult healthcare professionals for medical concerns.
-        </div>
-
-        <div class="chat-messages" id="chatMessages">
-            <div class="message bot">
-                <div class="message-avatar">AI</div>
-                <div class="message-content">
-                    Hello! I'm your healthcare AI assistant. I can help you assess your symptoms and provide general health guidance. To get started, please tell me what symptoms you're experiencing or choose from the options below.
-                </div>
+    <div class="main-container">
+        <div class="app-container">
+            <!-- Header -->
+            <div class="app-header">
+                <h1>🏥 Healthcare AI Assistant</h1>
+                <p>Get personalized health guidance through chat or smart symptom tracking</p>
             </div>
-        </div>
 
-        <div class="chat-input-container">
-            <div class="quick-options" id="quickOptions">
-                <div class="quick-option" onclick="sendQuickMessage('I have a headache')">I have a headache</div>
-                <div class="quick-option" onclick="sendQuickMessage('I feel nauseous')">I feel nauseous</div>
-                <div class="quick-option" onclick="sendQuickMessage('I have a fever')">I have a fever</div>
-                <div class="quick-option" onclick="sendQuickMessage('I have chest pain')">I have chest pain</div>
-            </div>
-            
-            <div class="chat-input-wrapper">
-                <textarea 
-                    id="messageInput" 
-                    class="chat-input" 
-                    placeholder="Describe your symptoms..." 
-                    rows="1"
-                    onkeypress="handleKeyPress(event)"
-                ></textarea>
-                <button id="sendButton" class="send-button" onclick="sendMessage()">
-                    ➤
+            <!-- Service Selector -->
+            <div class="service-selector">
+                <button class="service-tab active" data-service="chat">
+                    <span class="icon">💬</span>
+                    Chat Assistant
                 </button>
+                <button class="service-tab" data-service="tracker">
+                    <span class="icon">📋</span>
+                    Symptom Tracker
+                </button>
+            </div>
+
+            <!-- Content Area -->
+            <div class="content-area">
+                <!-- Chat Service -->
+                <div class="service-content active" id="chatService">
+                    <div class="chat-interface">
+                        <div class="disclaimer">
+                            ⚠️ This tool provides general information only and is not a substitute for professional medical advice.
+                        </div>
+
+                        <div class="chat-messages" id="chatMessages">
+                            <div class="message bot">
+                                <div class="message-avatar">AI</div>
+                                <div class="message-content">
+                                    Hi! I'm your healthcare AI assistant. I can help you understand your symptoms and provide guidance. What's bothering you today?
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="chat-input-container">
+                            <div class="quick-options" id="quickOptions">
+                                <div class="quick-option" onclick="sendQuickMessage('I have a headache')">Headache</div>
+                                <div class="quick-option" onclick="sendQuickMessage('I feel nauseous')">Nausea</div>
+                                <div class="quick-option" onclick="sendQuickMessage('I have a fever')">Fever</div>
+                                <div class="quick-option" onclick="sendQuickMessage('I have chest pain')">Chest pain</div>
+                            </div>
+                            
+                            <div class="chat-input-wrapper">
+                                <textarea 
+                                    id="messageInput" 
+                                    class="chat-input" 
+                                    placeholder="Describe your symptoms..." 
+                                    rows="1"
+                                    onkeypress="handleKeyPress(event)"
+                                ></textarea>
+                                <button id="sendButton" class="send-button" onclick="sendMessage()">
+                                    ➤
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Symptom Tracker Service -->
+                <div class="service-content" id="trackerService">
+                    <div class="symptom-tracker">
+                        <div class="tracker-section">
+                            <h3>Select Your Symptoms</h3>
+                            <div class="symptom-grid">
+                                <div class="symptom-card" data-symptom="headache">
+                                    <span class="icon">🤕</span>
+                                    <div class="label">Headache</div>
+                                </div>
+                                <div class="symptom-card" data-symptom="fever">
+                                    <span class="icon">🌡️</span>
+                                    <div class="label">Fever</div>
+                                </div>
+                                <div class="symptom-card" data-symptom="cough">
+                                    <span class="icon">😷</span>
+                                    <div class="label">Cough</div>
+                                </div>
+                                <div class="symptom-card" data-symptom="nausea">
+                                    <span class="icon">🤢</span>
+                                    <div class="label">Nausea</div>
+                                </div>
+                                <div class="symptom-card" data-symptom="chest_pain">
+                                    <span class="icon">💔</span>
+                                    <div class="label">Chest Pain</div>
+                                </div>
+                                <div class="symptom-card" data-symptom="fatigue">
+                                    <span class="icon">😴</span>
+                                    <div class="label">Fatigue</div>
+                                </div>
+                                <div class="symptom-card" data-symptom="dizziness">
+                                    <span class="icon">😵</span>
+                                    <div class="label">Dizziness</div>
+                                </div>
+                                <div class="symptom-card" data-symptom="stomach_pain">
+                                    <span class="icon">🤰</span>
+                                    <div class="label">Stomach Pain</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="severity-section">
+                            <h3>Rate Your Symptom Severity</h3>
+                            <div class="severity-slider">
+                                <input type="range" id="severitySlider" min="1" max="10" value="5" step="1">
+                                <div class="severity-value-indicator" id="severityIndicator">5</div>
+                            </div>
+                            <div class="severity-labels">
+                                <span>Mild (1-3)</span>
+                                <span>Moderate (4-6)</span>
+                                <span>Severe (7-10)</span>
+                            </div>
+                            <p id="severityText">Moderate discomfort</p>
+                        </div>
+
+                        <button class="analyze-button" onclick="analyzeSymptoms()">
+                            📊 Analyze My Symptoms
+                        </button>
+
+                        <div class="results-panel" id="trackerResults">
+                            <!-- Results will be populated here -->
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
     <script>
+        // Global variables
+        let selectedSymptoms = [];
+        let currentSeverity = 5;
+
+        // Service switching
+        document.querySelectorAll('.service-tab').forEach(tab => {
+            tab.addEventListener('click', function() {
+                const service = this.dataset.service;
+                switchService(service);
+            });
+        });
+
+        function switchService(service) {
+            // Update tabs
+            document.querySelectorAll('.service-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelector(`[data-service="${service}"]`).classList.add('active');
+
+            // Update content
+            document.querySelectorAll('.service-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            document.getElementById(`${service}Service`).classList.add('active');
+        }
+
+        // Chat functionality
         const chatMessages = document.getElementById('chatMessages');
         const messageInput = document.getElementById('messageInput');
         const sendButton = document.getElementById('sendButton');
         const quickOptions = document.getElementById('quickOptions');
 
-        // Auto-resize textarea
         messageInput.addEventListener('input', function() {
             this.style.height = 'auto';
             this.style.height = Math.min(this.scrollHeight, 120) + 'px';
@@ -293,27 +776,23 @@
             const message = messageInput.value.trim();
             if (!message) return;
 
-            // Disable input while processing
             setInputState(false);
-            
-            // Add user message
             addMessage(message, 'user');
             messageInput.value = '';
             messageInput.style.height = 'auto';
-
+            
             // Hide quick options after first message
-            quickOptions.style.display = 'none';
+            if (quickOptions.style.display !== 'none') {
+                quickOptions.style.display = 'none';
+            }
 
             // Show typing indicator
             showTypingIndicator();
 
             try {
-                // Send to backend
                 const response = await fetch('/api/chat', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ message: message })
                 });
 
@@ -332,27 +811,7 @@
                 addMessage('I\'m having trouble connecting right now. Please try again later or seek immediate medical attention if this is urgent.', 'bot');
             }
 
-            // Re-enable input
             setInputState(true);
-        }
-
-        function addMessage(content, sender) {
-            const messageDiv = document.createElement('div');
-            messageDiv.className = `message ${sender}`;
-            
-            const avatar = document.createElement('div');
-            avatar.className = 'message-avatar';
-            avatar.textContent = sender === 'user' ? 'U' : 'AI';
-            
-            const messageContent = document.createElement('div');
-            messageContent.className = 'message-content';
-            messageContent.textContent = content;
-            
-            messageDiv.appendChild(avatar);
-            messageDiv.appendChild(messageContent);
-            
-            chatMessages.appendChild(messageDiv);
-            chatMessages.scrollTop = chatMessages.scrollHeight;
         }
 
         function showTypingIndicator() {
@@ -378,7 +837,11 @@
             typingDiv.appendChild(avatar);
             typingDiv.appendChild(typingContent);
             chatMessages.appendChild(typingDiv);
-            chatMessages.scrollTop = chatMessages.scrollHeight;
+            
+            // Smooth scroll to typing indicator
+            requestAnimationFrame(() => {
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            });
         }
 
         function hideTypingIndicator() {
@@ -386,6 +849,29 @@
             if (typingIndicator) {
                 typingIndicator.remove();
             }
+        }
+
+        function addMessage(content, sender) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${sender}`;
+            
+            const avatar = document.createElement('div');
+            avatar.className = 'message-avatar';
+            avatar.textContent = sender === 'user' ? 'U' : 'AI';
+            
+            const messageContent = document.createElement('div');
+            messageContent.className = 'message-content';
+            messageContent.textContent = content;
+            
+            messageDiv.appendChild(avatar);
+            messageDiv.appendChild(messageContent);
+            
+            chatMessages.appendChild(messageDiv);
+            
+            // Ensure smooth scrolling to bottom
+            requestAnimationFrame(() => {
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            });
         }
 
         function setInputState(enabled) {
@@ -396,7 +882,132 @@
             }
         }
 
-        // Focus input on load
+        // Symptom tracker functionality
+        document.querySelectorAll('.symptom-card').forEach(card => {
+            card.addEventListener('click', function() {
+                const symptom = this.dataset.symptom;
+                this.classList.toggle('selected');
+                
+                if (this.classList.contains('selected')) {
+                    selectedSymptoms.push(symptom);
+                } else {
+                    selectedSymptoms = selectedSymptoms.filter(s => s !== symptom);
+                }
+            });
+        });
+
+        const severitySlider = document.getElementById('severitySlider');
+        const severityText = document.getElementById('severityText');
+        const severityIndicator = document.getElementById('severityIndicator');
+
+        // Update severity in real-time as user drags
+        severitySlider.addEventListener('input', function() {
+            currentSeverity = parseInt(this.value);
+            updateSeverityDisplay();
+            updateSliderPosition();
+        });
+
+        // Also update on change for accessibility
+        severitySlider.addEventListener('change', function() {
+            currentSeverity = parseInt(this.value);
+            updateSeverityDisplay();
+        });
+
+        function updateSeverityDisplay() {
+            let description, color;
+            
+            if (currentSeverity <= 3) {
+                description = "Mild discomfort - manageable";
+                color = "#4caf50";
+            } else if (currentSeverity <= 6) {
+                description = "Moderate discomfort - noticeable";
+                color = "#ff9800";
+            } else {
+                description = "Severe discomfort - significantly affecting you";
+                color = "#f44336";
+            }
+            
+            severityText.textContent = description;
+            severityText.style.color = color;
+            severityIndicator.textContent = currentSeverity;
+        }
+
+        function updateSliderPosition() {
+            // Calculate the position of the indicator based on slider value
+            const percent = ((currentSeverity - 1) / 9) * 100;
+            severityIndicator.style.left = `${percent}%`;
+        }
+
+        async function analyzeSymptoms() {
+            if (selectedSymptoms.length === 0) {
+                alert('Please select at least one symptom');
+                return;
+            }
+
+            const button = document.querySelector('.analyze-button');
+            button.textContent = 'Analyzing...';
+            button.disabled = true;
+
+            try {
+                // Create a natural language description for the chat API
+                const symptomDescription = `I have ${selectedSymptoms.map(s => s.replace('_', ' ')).join(', ')}. The severity is ${currentSeverity} out of 10.`;
+                
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        message: symptomDescription,
+                        source: 'symptom_tracker'
+                    })
+                });
+
+                const data = await response.json();
+                displayTrackerResults(data);
+                
+            } catch (error) {
+                alert('Unable to analyze symptoms. Please try again.');
+            } finally {
+                button.textContent = '📊 Analyze My Symptoms';
+                button.disabled = false;
+            }
+        }
+
+        function displayTrackerResults(result) {
+            const resultsPanel = document.getElementById('trackerResults');
+            
+            // Determine urgency based on response content
+            let urgency = 'low';
+            if (result.response.toLowerCase().includes('emergency') || result.response.toLowerCase().includes('call 911')) {
+                urgency = 'high';
+            } else if (result.response.toLowerCase().includes('see a doctor') || result.response.toLowerCase().includes('healthcare provider')) {
+                urgency = 'medium';
+            }
+
+            resultsPanel.innerHTML = `
+                <div class="urgency-badge urgency-${urgency}">
+                    ${urgency.toUpperCase()} PRIORITY
+                </div>
+                <h3>Assessment Results</h3>
+                <p>${result.response}</p>
+                <div style="margin-top: 15px; padding: 15px; background: white; border-radius: 8px; border-left: 4px solid #2196f3;">
+                    <strong>💡 Tip:</strong> You can also use the chat assistant for more detailed questions about your symptoms.
+                </div>
+            `;
+            
+            resultsPanel.style.display = 'block';
+            
+            // Smooth scroll to results with proper timing
+            setTimeout(() => {
+                resultsPanel.scrollIntoView({ 
+                    behavior: 'smooth', 
+                    block: 'nearest'
+                });
+            }, 100);
+        }
+
+        // Initialize
+        updateSeverityDisplay();
+        updateSliderPosition();
         messageInput.focus();
     </script>
 </body>
