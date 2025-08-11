@@ -5,475 +5,201 @@ const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch
 const apiConfig = require('../../config/api-endpoints').clinicalTrials;
 const cacheConfig = require('../../config/cache-config');
 
-class ClinicalTrialsService {
-    constructor(cacheManager) {
-        this.baseUrl = apiConfig.baseUrl;
-        this.endpoints = apiConfig.endpoints;
-        this.cache = cacheManager;
-        this.timeout = apiConfig.timeout;
-        this.lastRequestTime = 0;
-        this.requestDelay = 60000 / apiConfig.rateLimit.requests;
+// Working ClinicalTrials.gov API v2 Implementation
+// Based on actual API testing results
+
+class ClinicalTrialsService{
+    constructor() {
+        this.baseUrl = 'https://clinicaltrials.gov/api/v2';
+        this.defaultPageSize = 20;
+        this.maxPageSize = 1000;
     }
 
-    async searchTrialsByCondition(condition, options = {}) {
-        const cacheKey = `${cacheConfig.keyPrefixes.clinicalTrials}condition_${condition}`;
+    /**
+     * Search for clinical trials with WORKING parameters only
+     * @param {Object} params - Search parameters
+     * @returns {Promise<Object>} - API response
+     */
+    async searchStudies(params = {}) {
+        const queryParams = this.buildWorkingQueryParams(params);
+        const url = `${this.baseUrl}/studies?${queryParams}`;
         
-        const cached = await this.cache.get(cacheKey);
-        if (cached && !options.skipCache) {
-            return cached;
-        }
-
         try {
-            await this.enforceRateLimit();
-            
-            const params = new URLSearchParams({
-                'expr': condition,
-                'min_rnk': '1',
-                'max_rnk': options.limit || '10',
-                'fmt': 'json'
-            });
-
-            const url = `${this.baseUrl}${this.endpoints.fullStudies}?${params}`;
-            const response = await this.makeRequest(url);
+            console.log(`🔬 Searching Clinical Trials: ${url}`);
+            const response = await fetch(url);
             
             if (!response.ok) {
-                throw new Error(`Clinical Trials API error: ${response.status}`);
+                const errorText = await response.text();
+                throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
             }
             
-            const data = await response.json();
-            const trials = this.formatTrialResults(data);
-            
-            await this.cache.set(cacheKey, trials, cacheConfig.timeouts.clinicalTrials);
-            
-            return trials;
-            
+            return await response.json();
         } catch (error) {
-            console.error('Clinical Trials search error:', error);
-            return this.getFallbackTrialInfo(condition);
-        }
-    }
-
-    formatTrialResults(data) {
-        const trials = [];
-        
-        if (data.FullStudiesResponse?.FullStudies) {
-            for (const study of data.FullStudiesResponse.FullStudies.slice(0, 5)) {
-                const studyData = study.Study;
-                
-                trials.push({
-                    id: studyData.ProtocolSection?.IdentificationModule?.NCTId,
-                    title: studyData.ProtocolSection?.IdentificationModule?.BriefTitle,
-                    status: studyData.ProtocolSection?.StatusModule?.OverallStatus,
-                    phase: studyData.ProtocolSection?.DesignModule?.PhaseList?.Phase?.[0],
-                    condition: studyData.ProtocolSection?.ConditionsModule?.ConditionList?.Condition?.[0],
-                    intervention: studyData.ProtocolSection?.ArmsInterventionsModule?.InterventionList?.Intervention?.[0]?.InterventionName,
-                    enrollment: studyData.ProtocolSection?.DesignModule?.EnrollmentInfo?.EnrollmentCount,
-                    lastUpdate: studyData.ProtocolSection?.StatusModule?.LastUpdateSubmitDate,
-                    source: 'ClinicalTrials.gov'
-                });
-            }
-        }
-        
-        return trials;
-    }
-
-    getFallbackTrialInfo(condition) {
-        return [{
-            id: 'fallback',
-            title: `Clinical trials may be available for ${condition}`,
-            status: 'See ClinicalTrials.gov for current studies',
-            source: 'Fallback'
-        }];
-    }
-
-    async makeRequest(url) {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), this.timeout);
-
-        try {
-            const response = await fetch(url, {
-                signal: controller.signal,
-                headers: { 'User-Agent': 'Healthcare-Chatbot/1.0' }
-            });
-            
-            clearTimeout(timeoutId);
-            return response;
-        } catch (error) {
-            clearTimeout(timeoutId);
+            console.error('Error fetching clinical trials:', error);
             throw error;
         }
     }
 
-    async enforceRateLimit() {
-        const now = Date.now();
-        const timeSinceLastRequest = now - this.lastRequestTime;
+    /**
+     * Get a specific study by NCT ID
+     * @param {string} nctId - NCT identifier (e.g., "NCT04267848")
+     * @returns {Promise<Object>} - Study details
+     */
+    async getStudyById(nctId) {
+        const url = `${this.baseUrl}/studies/${nctId}`;
         
-        if (timeSinceLastRequest < this.requestDelay) {
-            const waitTime = this.requestDelay - timeSinceLastRequest;
-            await new Promise(resolve => setTimeout(resolve, waitTime));
-        }
-        
-        this.lastRequestTime = Date.now();
-    }
-
-    async healthCheck() {
         try {
-            const testResult = await this.searchTrialsByCondition('headache', { limit: 1, skipCache: true });
-            return {
-                service: 'ClinicalTrials',
-                status: testResult.length > 0 ? 'healthy' : 'degraded',
-                lastChecked: new Date().toISOString()
-            };
-        } catch (error) {
-            return {
-                service: 'ClinicalTrials',
-                status: 'error',
-                error: error.message,
-                lastChecked: new Date().toISOString()
-            };
-        }
-    }
-}
-
-// backend/services/medical-apis/medlineplus-service.js
-// MedlinePlus Health Information Service
-
-class MedlinePlusService {
-    constructor(cacheManager) {
-        this.baseUrl = require('../../config/api-endpoints').medlinePlus.baseUrl;
-        this.cache = cacheManager;
-        this.timeout = 5000;
-        this.lastRequestTime = 0;
-        this.requestDelay = 6000; // 10 requests per minute
-    }
-
-    async searchHealthTopics(topic, options = {}) {
-        const cacheKey = `medlineplus_${topic}`;
-        
-        const cached = await this.cache.get(cacheKey);
-        if (cached && !options.skipCache) {
-            return cached;
-        }
-
-        try {
-            await this.enforceRateLimit();
-            
-            const params = new URLSearchParams({
-                'db': 'healthTopics',
-                'term': topic,
-                'knowledgeResponseType': 'application/json',
-                'tool': 'healthcare-chatbot',
-                'email': 'support@healthchatbot.com'
-            });
-
-            const url = `${this.baseUrl}?${params}`;
-            const response = await this.makeRequest(url);
+            console.log(`🔬 Fetching study: ${nctId}`);
+            const response = await fetch(url);
             
             if (!response.ok) {
-                throw new Error(`MedlinePlus API error: ${response.status}`);
+                const errorText = await response.text();
+                throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
             }
             
-            const data = await response.json();
-            const healthInfo = this.formatHealthTopics(data);
-            
-            await this.cache.set(cacheKey, healthInfo, 24 * 60 * 60 * 1000); // 24 hours
-            
-            return healthInfo;
-            
+            return await response.json();
         } catch (error) {
-            console.error('MedlinePlus search error:', error);
-            return this.getFallbackHealthInfo(topic);
+            console.error(`Error fetching study ${nctId}:`, error);
+            throw error;
         }
     }
 
-    formatHealthTopics(data) {
-        const topics = [];
+    /**
+     * Build query parameters using ONLY working parameters
+     * Based on actual API testing - removes unsupported parameters
+     * @param {Object} params - Parameters object
+     * @returns {string} - URL encoded query string
+     */
+    buildWorkingQueryParams(params) {
+        const queryParams = new URLSearchParams();
+
+        // ✅ WORKING PARAMETERS (confirmed by testing)
+        if (params.condition) queryParams.append('query.cond', params.condition);
+        if (params.intervention) queryParams.append('query.intr', params.intervention);
+        if (params.title) queryParams.append('query.titles', params.title);
+        if (params.term) queryParams.append('query.term', params.term);
+        if (params.location) queryParams.append('query.locn', params.location);
         
-        if (data.nlmSearchResult?.list?.document) {
-            for (const doc of data.nlmSearchResult.list.document.slice(0, 3)) {
-                topics.push({
-                    id: doc.id,
-                    title: doc.content?.title,
-                    summary: doc.content?.summary || 'Health information available',
-                    url: doc.content?.url,
-                    lastRevised: doc.content?.lastRevised,
-                    source: 'MedlinePlus'
-                });
+        // Pagination and formatting (these work)
+        if (params.pageSize) queryParams.append('pageSize', Math.min(params.pageSize, this.maxPageSize));
+        if (params.pageToken) queryParams.append('pageToken', params.pageToken);
+        if (params.countTotal) queryParams.append('countTotal', params.countTotal);
+        if (params.format === 'csv') queryParams.append('format', 'csv');
+        
+        // Specific NCT IDs
+        if (params.nctIds && Array.isArray(params.nctIds)) {
+            queryParams.append('filter.ids', params.nctIds.join(','));
+        }
+
+        // ❌ REMOVED NON-WORKING PARAMETERS:
+        // - query.recrs (recruitment status) - returns "unknown parameter"
+        // - query.phase (study phase) - returns "unknown parameter" 
+        // - query.type (study type) - not tested but likely similar issue
+        // - query.spons (sponsor) - not tested but likely similar issue
+        // - Date filters - not tested in working combinations
+
+        return queryParams.toString();
+    }
+
+    /**
+     * Search with pagination to get all results
+     * @param {Object} params - Search parameters
+     * @returns {Promise<Array>} - All studies found
+     */
+    async searchAllStudies(params = {}) {
+        let allStudies = [];
+        let nextPageToken = null;
+        let pageCount = 0;
+        const maxPages = 10; // Reduced for safety
+
+        do {
+            const searchParams = {
+                ...params,
+                pageSize: this.maxPageSize,
+                ...(nextPageToken && { pageToken: nextPageToken })
+            };
+
+            const response = await this.searchStudies(searchParams);
+            
+            if (response.studies) {
+                allStudies = allStudies.concat(response.studies);
+                console.log(`📄 Page ${++pageCount}: Found ${response.studies.length} studies (Total: ${allStudies.length})`);
             }
-        }
-        
-        return topics;
+
+            nextPageToken = response.nextPageToken;
+
+        } while (nextPageToken && pageCount < maxPages);
+
+        console.log(`✅ Search complete: ${allStudies.length} total studies found`);
+        return allStudies;
     }
 
-    getFallbackHealthInfo(topic) {
-        const fallbackInfo = {
-            'headache': {
-                title: 'Headache Information',
-                summary: 'Headaches can have many causes. Most are not serious, but some require medical attention.',
-                source: 'MedlinePlus-Fallback'
+    /**
+     * Extract key information from study data
+     * @param {Object} study - Study object from API response
+     * @returns {Object} - Simplified study information
+     */
+    extractStudyInfo(study) {
+        const protocol = study.protocolSection || {};
+        const identification = protocol.identificationModule || {};
+        const status = protocol.statusModule || {};
+        const design = protocol.designModule || {};
+        const eligibility = protocol.eligibilityModule || {};
+        const contacts = protocol.contactsLocationsModule || {};
+
+        return {
+            nctId: identification.nctId,
+            title: identification.briefTitle,
+            officialTitle: identification.officialTitle,
+            status: status.overallStatus,
+            phase: design.phases?.[0] || 'N/A',
+            studyType: design.studyType,
+            conditions: protocol.conditionsModule?.conditions || [],
+            interventions: protocol.armsInterventionsModule?.interventions || [],
+            eligibility: {
+                criteria: eligibility.eligibilityCriteria,
+                gender: eligibility.sex,
+                minimumAge: eligibility.minimumAge,
+                maximumAge: eligibility.maximumAge
             },
-            'fever': {
-                title: 'Fever Information', 
-                summary: 'Fever is often a sign that your body is fighting an infection.',
-                source: 'MedlinePlus-Fallback'
-            }
+            enrollment: design.enrollmentInfo?.count,
+            startDate: status.startDateStruct?.date,
+            completionDate: status.completionDateStruct?.date,
+            sponsor: protocol.sponsorCollaboratorsModule?.leadSponsor?.name,
+            locations: contacts.locations?.map(loc => ({
+                facility: loc.facility,
+                city: loc.city,
+                state: loc.state,
+                country: loc.country
+            })) || []
         };
-        
-        const info = fallbackInfo[topic.toLowerCase()];
-        return info ? [info] : [];
     }
 
-    async makeRequest(url) {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), this.timeout);
-
-        try {
-            const response = await fetch(url, {
-                signal: controller.signal,
-                headers: { 'User-Agent': 'Healthcare-Chatbot/1.0' }
-            });
-            
-            clearTimeout(timeoutId);
-            return response;
-        } catch (error) {
-            clearTimeout(timeoutId);
-            throw error;
-        }
+    /**
+     * Helper method to filter studies by status after retrieval
+     * Since query.recrs doesn't work, we filter client-side
+     * @param {Array} studies - Array of study objects
+     * @param {string} status - Status to filter by (e.g., 'RECRUITING')
+     * @returns {Array} - Filtered studies
+     */
+    filterByStatus(studies, status) {
+        return studies.filter(study => {
+            const studyStatus = study.protocolSection?.statusModule?.overallStatus;
+            return studyStatus && studyStatus.toUpperCase() === status.toUpperCase();
+        });
     }
 
-    async enforceRateLimit() {
-        const now = Date.now();
-        const timeSinceLastRequest = now - this.lastRequestTime;
-        
-        if (timeSinceLastRequest < this.requestDelay) {
-            const waitTime = this.requestDelay - timeSinceLastRequest;
-            await new Promise(resolve => setTimeout(resolve, waitTime));
-        }
-        
-        this.lastRequestTime = Date.now();
-    }
-
-    async healthCheck() {
-        try {
-            const testResult = await this.searchHealthTopics('headache', { skipCache: true });
-            return {
-                service: 'MedlinePlus',
-                status: 'healthy',
-                lastChecked: new Date().toISOString()
-            };
-        } catch (error) {
-            return {
-                service: 'MedlinePlus',
-                status: 'error',
-                error: error.message,
-                lastChecked: new Date().toISOString()
-            };
-        }
+    /**
+     * Helper method to filter studies by phase after retrieval
+     * Since query.phase doesn't work, we filter client-side
+     * @param {Array} studies - Array of study objects
+     * @param {string} phase - Phase to filter by (e.g., 'PHASE2')
+     * @returns {Array} - Filtered studies
+     */
+    filterByPhase(studies, phase) {
+        return studies.filter(study => {
+            const phases = study.protocolSection?.designModule?.phases || [];
+            return phases.some(p => p.toUpperCase() === phase.toUpperCase());
+        });
     }
 }
-
-// backend/services/medical-apis/openfda-service.js
-// OpenFDA Drug Safety and Adverse Events
-
-class OpenFDAService {
-    constructor(cacheManager) {
-        this.baseUrl = require('../../config/api-endpoints').drugInteractions.openFDA.baseUrl;
-        this.endpoints = require('../../config/api-endpoints').drugInteractions.openFDA.endpoints;
-        this.cache = cacheManager;
-        this.timeout = 8000;
-        this.lastRequestTime = 0;
-        this.requestDelay = 7500; // 8 requests per minute
-    }
-
-    async searchDrugEvents(drugName, options = {}) {
-        const cacheKey = `openfda_events_${drugName}`;
-        
-        const cached = await this.cache.get(cacheKey);
-        if (cached && !options.skipCache) {
-            return cached;
-        }
-
-        try {
-            await this.enforceRateLimit();
-            
-            const params = new URLSearchParams({
-                'search': `patient.drug.medicinalproduct:"${drugName}"`,
-                'limit': options.limit || '10'
-            });
-
-            const url = `${this.baseUrl}${this.endpoints.drugs}?${params}`;
-            const response = await this.makeRequest(url);
-            
-            if (!response.ok) {
-                throw new Error(`OpenFDA API error: ${response.status}`);
-            }
-            
-            const data = await response.json();
-            const events = this.formatDrugEvents(data);
-            
-            await this.cache.set(cacheKey, events, 2 * 60 * 60 * 1000); // 2 hours
-            
-            return events;
-            
-        } catch (error) {
-            console.error('OpenFDA drug events search error:', error);
-            return this.getFallbackDrugSafety(drugName);
-        }
-    }
-
-    async searchDrugLabels(drugName, options = {}) {
-        const cacheKey = `openfda_labels_${drugName}`;
-        
-        const cached = await this.cache.get(cacheKey);
-        if (cached && !options.skipCache) {
-            return cached;
-        }
-
-        try {
-            await this.enforceRateLimit();
-            
-            const params = new URLSearchParams({
-                'search': `openfda.brand_name:"${drugName}" OR openfda.generic_name:"${drugName}"`,
-                'limit': options.limit || '3'
-            });
-
-            const url = `${this.baseUrl}${this.endpoints.labels}?${params}`;
-            const response = await this.makeRequest(url);
-            
-            if (!response.ok) {
-                throw new Error(`OpenFDA Labels API error: ${response.status}`);
-            }
-            
-            const data = await response.json();
-            const labels = this.formatDrugLabels(data);
-            
-            await this.cache.set(cacheKey, labels, 24 * 60 * 60 * 1000); // 24 hours
-            
-            return labels;
-            
-        } catch (error) {
-            console.error('OpenFDA drug labels search error:', error);
-            return this.getFallbackDrugLabels(drugName);
-        }
-    }
-
-    formatDrugEvents(data) {
-        const events = [];
-        
-        if (data.results) {
-            // Aggregate common adverse events
-            const eventCounts = {};
-            
-            for (const result of data.results.slice(0, 50)) {
-                if (result.patient?.reaction) {
-                    for (const reaction of result.patient.reaction) {
-                        const term = reaction.reactionmeddrapt;
-                        eventCounts[term] = (eventCounts[term] || 0) + 1;
-                    }
-                }
-            }
-            
-            // Convert to sorted array
-            const sortedEvents = Object.entries(eventCounts)
-                .sort((a, b) => b[1] - a[1])
-                .slice(0, 10);
-                
-            for (const [event, count] of sortedEvents) {
-                events.push({
-                    reaction: event,
-                    reportCount: count,
-                    frequency: count > 10 ? 'Common' : count > 5 ? 'Occasional' : 'Rare',
-                    source: 'OpenFDA'
-                });
-            }
-        }
-        
-        return events;
-    }
-
-    formatDrugLabels(data) {
-        const labels = [];
-        
-        if (data.results) {
-            for (const label of data.results.slice(0, 3)) {
-                labels.push({
-                    brandName: label.openfda?.brand_name?.[0],
-                    genericName: label.openfda?.generic_name?.[0],
-                    warnings: label.warnings?.[0]?.substring(0, 500) + '...',
-                    contraindications: label.contraindications?.[0]?.substring(0, 300) + '...',
-                    dosageAndAdministration: label.dosage_and_administration?.[0]?.substring(0, 300) + '...',
-                    adverseReactions: label.adverse_reactions?.[0]?.substring(0, 400) + '...',
-                    source: 'OpenFDA'
-                });
-            }
-        }
-        
-        return labels;
-    }
-
-    getFallbackDrugSafety(drugName) {
-        return [{
-            reaction: 'Consult healthcare provider for safety information',
-            frequency: 'Always recommended',
-            source: 'OpenFDA-Fallback'
-        }];
-    }
-
-    getFallbackDrugLabels(drugName) {
-        return [{
-            brandName: drugName,
-            warnings: 'Always read medication labels and consult healthcare providers',
-            source: 'OpenFDA-Fallback'
-        }];
-    }
-
-    async makeRequest(url) {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), this.timeout);
-
-        try {
-            const response = await fetch(url, {
-                signal: controller.signal,
-                headers: { 'User-Agent': 'Healthcare-Chatbot/1.0' }
-            });
-            
-            clearTimeout(timeoutId);
-            return response;
-        } catch (error) {
-            clearTimeout(timeoutId);
-            throw error;
-        }
-    }
-
-    async enforceRateLimit() {
-        const now = Date.now();
-        const timeSinceLastRequest = now - this.lastRequestTime;
-        
-        if (timeSinceLastRequest < this.requestDelay) {
-            const waitTime = this.requestDelay - timeSinceLastRequest;
-            await new Promise(resolve => setTimeout(resolve, waitTime));
-        }
-        
-        this.lastRequestTime = Date.now();
-    }
-
-    async healthCheck() {
-        try {
-            const testResult = await this.searchDrugLabels('aspirin', { limit: 1, skipCache: true });
-            return {
-                service: 'OpenFDA',
-                status: testResult.length > 0 ? 'healthy' : 'degraded',
-                lastChecked: new Date().toISOString()
-            };
-        } catch (error) {
-            return {
-                service: 'OpenFDA',
-                status: 'error',
-                error: error.message,
-                lastChecked: new Date().toISOString()
-            };
-        }
-    }
-}
-
-module.exports = { ClinicalTrialsService, MedlinePlusService, OpenFDAService };

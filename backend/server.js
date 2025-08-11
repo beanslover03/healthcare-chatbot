@@ -15,9 +15,9 @@ let claudeService, medicalAPI;
 
 async function initializeServices() {
     try {
-        console.log('🔍 Initializing Claude service...');
+        console.log('🔍 Initializing Enhanced Claude service...');
         claudeService = new ClaudeService();
-        console.log('✅ Claude service initialized');
+        console.log('✅ Enhanced Claude service initialized');
         
         console.log('🔍 Initializing Enhanced Medical API service...');
         medicalAPI = new MedicalAPIService();
@@ -81,6 +81,7 @@ app.post('/api/chat', validateInput, async (req, res) => {
         let response;
         let urgency = 'normal';
         let medicalData = null;
+        let enhancedMetadata = {}; // Initialize this
 
         // Emergency check first
         if (claudeService.isEmergency(message)) {
@@ -92,6 +93,7 @@ app.post('/api/chat', validateInput, async (req, res) => {
             // ENHANCED: Comprehensive medical analysis using ALL 5 databases
             console.log('🔍 Analyzing symptoms with ALL medical databases...');
             try {
+                // Use regular analyzeSymptoms since enhancedAnalyzeSymptoms might not exist yet
                 medicalData = await medicalAPI.analyzeSymptoms([], message);
                 console.log('📊 Enhanced medical analysis results:', {
                     symptomsFound: medicalData.symptoms?.length || 0,
@@ -110,16 +112,18 @@ app.post('/api/chat', validateInput, async (req, res) => {
             
             // Claude assessment with enhanced medical data
             if (source === 'symptom_tracker') {
-                response = await claudeService.assessSymptoms(message, medicalData, history);
-                response = response.response || response;
+                const assessmentResult = await claudeService.assessSymptoms(message, medicalData, history, sessionId);
+                response = assessmentResult.response;
+                enhancedMetadata = assessmentResult.metadata || {};
             } else if (claudeService.isConversationEnding(message)) {
                 console.log('👋 Conversation ending');
                 response = await claudeService.generateEndingResponse(history);
                 urgency = 'ending';
             } else {
                 console.log('💭 Normal conversation with enhanced medical context');
-                response = await claudeService.assessSymptoms(message, medicalData, history);
-                response = response.response || response;
+                const assessmentResult = await claudeService.assessSymptoms(message, medicalData, history, sessionId);
+                response = assessmentResult.response;
+                enhancedMetadata = assessmentResult.metadata || {};
             }
             
             // Enhanced urgency determination
@@ -152,6 +156,15 @@ app.post('/api/chat', validateInput, async (req, res) => {
             urgency: urgency,
             sessionId: sessionId,
             source: source,
+            // Enhanced metadata (safely handled)
+            enhancedFeatures: {
+                responseModality: enhancedMetadata.modality || 'conversational',
+                contextUsed: enhancedMetadata.context || 'general',
+                userProfile: enhancedMetadata.userProfile || null,
+                interactiveElements: enhancedMetadata.interactiveElements || [],
+                suggestedFollowUps: enhancedMetadata.suggestedFollowUps || [],
+                intelligenceLevel: 'enhanced'
+            },
             medicalData: medicalData ? {
                 symptomsAnalyzed: medicalData.symptoms?.length || 0,
                 databasesUsed: medicalData.apiSources || [],
@@ -410,6 +423,27 @@ app.get('/api/health', async (req, res) => {
     }
 });
 
+// NEW: Enhanced analytics endpoint
+app.get('/api/enhanced-analytics/:sessionId', async (req, res) => {
+    try {
+        const sessionId = req.params.sessionId;
+        const analytics = claudeService.getEnhancedAnalytics(sessionId);
+        
+        res.json({
+            success: true,
+            sessionId: sessionId,
+            analytics: analytics,
+            timestamp: new Date().toISOString()
+        });
+        
+    } catch (error) {
+        res.json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
 // NEW: Comprehensive medication lookup endpoint
 app.post('/api/medication-lookup', async (req, res) => {
     try {
@@ -506,6 +540,105 @@ app.post('/api/health-info', async (req, res) => {
         res.json({
             success: false,
             error: error.message
+        });
+    }
+});
+
+// NEW: Medical API debug endpoint
+app.post('/api/debug-medical-analysis', async (req, res) => {
+    try {
+        const { message } = req.body;
+        
+        if (!message) {
+            return res.json({
+                success: false,
+                error: 'Message is required'
+            });
+        }
+        
+        console.log(`🔍 DEBUG: Analyzing "${message}" with all medical APIs...`);
+        
+        // Get detailed analysis
+        const startTime = Date.now();
+        const medicalData = await medicalAPI.analyzeSymptoms([], message);
+        const endTime = Date.now();
+        
+        // Test each API individually
+        const individualTests = {};
+        
+        // Test RxNorm
+        try {
+            const rxnormTest = await medicalAPI.rxnorm.searchDrugs('aspirin');
+            individualTests.rxnorm = { status: 'working', results: rxnormTest.length };
+        } catch (error) {
+            individualTests.rxnorm = { status: 'error', error: error.message };
+        }
+        
+        // Test FHIR
+        try {
+            const fhirTest = await medicalAPI.fhir.searchConditions('headache');
+            individualTests.fhir = { status: 'working', results: fhirTest.length };
+        } catch (error) {
+            individualTests.fhir = { status: 'error', error: error.message };
+        }
+        
+        // Test Clinical Trials
+        try {
+            const trialsTest = await medicalAPI.clinicalTrials.searchTrialsByCondition('headache');
+            individualTests.clinicalTrials = { status: 'working', results: trialsTest.length };
+        } catch (error) {
+            individualTests.clinicalTrials = { status: 'error', error: error.message };
+        }
+        
+        // Test MedlinePlus
+        try {
+            const medlinePlusTest = await medicalAPI.medlinePlus.searchHealthTopics('fever');
+            individualTests.medlinePlus = { status: 'working', results: medlinePlusTest.length };
+        } catch (error) {
+            individualTests.medlinePlus = { status: 'error', error: error.message };
+        }
+        
+        // Test OpenFDA
+        try {
+            const openFDATest = await medicalAPI.openFDA.searchDrugLabels('ibuprofen');
+            individualTests.openFDA = { status: 'working', results: openFDATest.length };
+        } catch (error) {
+            individualTests.openFDA = { status: 'error', error: error.message };
+        }
+        
+        res.json({
+            success: true,
+            message: message,
+            analysisTime: `${endTime - startTime}ms`,
+            medicalAnalysis: {
+                symptoms: medicalData.symptoms || [],
+                conditions: medicalData.conditions || [],
+                medications: medicalData.medications || [],
+                clinicalTrials: medicalData.clinicalTrials || [],
+                healthInformation: medicalData.healthInformation || [],
+                drugSafety: medicalData.drugSafety || [],
+                apiSources: medicalData.apiSources || [],
+                confidence: medicalData.confidence || 'unknown'
+            },
+            individualAPITests: individualTests,
+            summary: {
+                totalAPIsUsed: medicalData.apiSources?.length || 0,
+                workingAPIs: Object.values(individualTests).filter(test => test.status === 'working').length,
+                totalDataFound: (medicalData.symptoms?.length || 0) + 
+                              (medicalData.conditions?.length || 0) + 
+                              (medicalData.medications?.length || 0) + 
+                              (medicalData.clinicalTrials?.length || 0) + 
+                              (medicalData.healthInformation?.length || 0)
+            },
+            timestamp: new Date().toISOString()
+        });
+        
+    } catch (error) {
+        console.error('Debug medical analysis error:', error);
+        res.json({
+            success: false,
+            error: error.message,
+            stack: error.stack
         });
     }
 });

@@ -56,6 +56,16 @@
             opacity: 0.9;
         }
 
+        /* API Status Bar */
+        .api-status {
+            padding: 8px;
+            text-align: center;
+            font-size: 12px;
+            background: #f5f5f5;
+            border-bottom: 1px solid #e0e0e0;
+            transition: all 0.3s ease;
+        }
+
         /* Service Selector */
         .service-selector {
             display: flex;
@@ -134,7 +144,7 @@
             padding: 10px 20px;
             font-size: 12px;
             text-align: center;
-            flex-shrink: 0; /* Prevent disclaimer from shrinking */
+            flex-shrink: 0;
         }
 
         .chat-messages {
@@ -142,8 +152,8 @@
             padding: 20px;
             overflow-y: auto;
             background: #f8f9fa;
-            min-height: 0; /* Critical: allows flex item to shrink below content size */
-            max-height: calc(100vh - 400px); /* Ensure it doesn't exceed viewport */
+            min-height: 0;
+            max-height: calc(100vh - 400px);
         }
 
         /* Custom scrollbar for chat messages */
@@ -186,7 +196,7 @@
             color: white;
             font-weight: bold;
             font-size: 14px;
-            flex-shrink: 0; /* Prevent avatar from shrinking */
+            flex-shrink: 0;
         }
 
         .message.user .message-avatar {
@@ -215,6 +225,16 @@
             background: white;
             border: 1px solid #e0e0e0;
             border-bottom-left-radius: 4px;
+        }
+
+        /* API Usage Indicator */
+        .api-usage-indicator {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            padding: 10px;
+            margin: 10px 0;
+            font-size: 12px;
+            border-radius: 4px;
         }
 
         .typing-indicator {
@@ -251,7 +271,7 @@
             padding: 20px;
             background: white;
             border-top: 1px solid #e0e0e0;
-            flex-shrink: 0; /* Prevent input area from shrinking */
+            flex-shrink: 0;
         }
 
         .quick-options {
@@ -313,7 +333,7 @@
             justify-content: center;
             font-size: 20px;
             transition: background 0.3s ease;
-            flex-shrink: 0; /* Prevent button from shrinking */
+            flex-shrink: 0;
         }
 
         .send-button:hover {
@@ -434,7 +454,6 @@
             box-shadow: 0 4px 12px rgba(0,0,0,0.4);
         }
 
-        /* Firefox slider thumb */
         .severity-slider input::-moz-range-thumb {
             width: 24px;
             height: 24px;
@@ -459,7 +478,6 @@
             border: none;
         }
 
-        /* Add visual feedback for the current value */
         .severity-value-indicator {
             position: absolute;
             top: -35px;
@@ -512,7 +530,6 @@
             cursor: not-allowed;
         }
 
-        /* Custom scrollbar for symptom tracker */
         .symptom-tracker::-webkit-scrollbar {
             width: 8px;
         }
@@ -531,7 +548,6 @@
             background: #a1a1a1;
         }
 
-        /* Ensure content doesn't get cut off */
         .results-panel {
             background: #f8f9fa;
             border-radius: 12px;
@@ -554,7 +570,6 @@
         .urgency-medium { background: #ffe0b2; color: #f57c00; }
         .urgency-high { background: #ffcdd2; color: #d32f2f; }
 
-        /* Responsive Design */
         @media (max-width: 768px) {
             .main-container {
                 padding: 10px;
@@ -600,6 +615,11 @@
                 <p>Get personalized health guidance through chat or smart symptom tracking</p>
             </div>
 
+            <!-- API Status Bar -->
+            <div id="apiStatus" class="api-status">
+                🔄 Checking API status...
+            </div>
+
             <!-- Service Selector -->
             <div class="service-selector">
                 <button class="service-tab active" data-service="chat">
@@ -636,6 +656,7 @@
                                 <div class="quick-option" onclick="sendQuickMessage('I feel nauseous')">Nausea</div>
                                 <div class="quick-option" onclick="sendQuickMessage('I have a fever')">Fever</div>
                                 <div class="quick-option" onclick="sendQuickMessage('I have chest pain')">Chest pain</div>
+                                <div class="quick-option" onclick="testMedicalAPIs()">🧪 Test APIs</div>
                             </div>
                             
                             <div class="chat-input-wrapper">
@@ -727,6 +748,93 @@
         let selectedSymptoms = [];
         let currentSeverity = 5;
 
+        // API Status Monitoring
+        async function updateAPIStatus() {
+            try {
+                const response = await fetch('/api/health');
+                const data = await response.json();
+                
+                const statusElement = document.getElementById('apiStatus');
+                const workingAPIs = Object.values(data.services.medical_apis.services || {})
+                    .filter(api => api.status === 'healthy').length;
+                
+                const totalAPIs = Object.keys(data.services.medical_apis.services || {}).length;
+                
+                if (workingAPIs === totalAPIs) {
+                    statusElement.innerHTML = `🟢 All ${totalAPIs} medical APIs online`;
+                    statusElement.style.background = '#c8e6c9';
+                } else if (workingAPIs > 0) {
+                    statusElement.innerHTML = `🟡 ${workingAPIs}/${totalAPIs} medical APIs online`;
+                    statusElement.style.background = '#fff3cd';
+                } else {
+                    statusElement.innerHTML = `🔴 Medical APIs offline`;
+                    statusElement.style.background = '#ffcdd2';
+                }
+            } catch (error) {
+                document.getElementById('apiStatus').innerHTML = '❌ Cannot check API status';
+            }
+        }
+
+        // Medical API Testing
+        async function testMedicalAPIs() {
+            try {
+                addMessage('🧪 Testing all medical APIs...', 'bot');
+                
+                const response = await fetch('/api/debug-medical-analysis', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: 'I have a headache and fever' })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    const summary = data.summary;
+                    const workingAPIs = Object.entries(data.individualAPITests)
+                        .filter(([name, test]) => test.status === 'working')
+                        .map(([name]) => name);
+                    
+                    const message = `🧪 API Test Results:
+• ${summary.workingAPIs}/5 APIs working
+• ${summary.totalAPIsUsed} APIs used for analysis
+• ${summary.totalDataFound} pieces of medical data found
+• Analysis time: ${data.analysisTime}
+
+Working APIs: ${workingAPIs.join(', ') || 'None'}`;
+                    
+                    addMessage(message, 'bot');
+                } else {
+                    addMessage('❌ API test failed: ' + data.error, 'bot');
+                }
+            } catch (error) {
+                addMessage('❌ Could not test APIs: ' + error.message, 'bot');
+            }
+        }
+
+        // Display API Usage Information
+        function displayAPIUsage(data) {
+            if (data.medicalData && data.medicalData.databasesUsed && data.medicalData.databasesUsed.length > 0) {
+                const apiIndicator = document.createElement('div');
+                apiIndicator.className = 'api-usage-indicator';
+                
+                const databases = data.medicalData.databasesUsed;
+                const confidence = data.medicalData.confidence;
+                
+                apiIndicator.innerHTML = `
+                    <strong>🔍 Medical Analysis:</strong><br>
+                    📊 Used ${databases.length} database(s): ${databases.join(', ')}<br>
+                    🎯 Confidence: ${confidence.toUpperCase()}<br>
+                    💊 Found: ${data.medicalData.symptomsAnalyzed} symptoms, ${data.medicalData.clinicalTrialsAvailable || 0} trials
+                `;
+                
+                // Add after the last bot message
+                const lastBotMessage = document.querySelector('.message.bot:last-child');
+                if (lastBotMessage) {
+                    lastBotMessage.appendChild(apiIndicator);
+                }
+            }
+        }
+
         // Service switching
         document.querySelectorAll('.service-tab').forEach(tab => {
             tab.addEventListener('click', function() {
@@ -736,13 +844,11 @@
         });
 
         function switchService(service) {
-            // Update tabs
             document.querySelectorAll('.service-tab').forEach(tab => {
                 tab.classList.remove('active');
             });
             document.querySelector(`[data-service="${service}"]`).classList.add('active');
 
-            // Update content
             document.querySelectorAll('.service-content').forEach(content => {
                 content.classList.remove('active');
             });
@@ -781,12 +887,10 @@
             messageInput.value = '';
             messageInput.style.height = 'auto';
             
-            // Hide quick options after first message
             if (quickOptions.style.display !== 'none') {
                 quickOptions.style.display = 'none';
             }
 
-            // Show typing indicator
             showTypingIndicator();
 
             try {
@@ -797,12 +901,14 @@
                 });
 
                 const data = await response.json();
-                
-                // Hide typing indicator
                 hideTypingIndicator();
                 
                 if (data.success) {
                     addMessage(data.response, 'bot');
+                    // Show API usage if available
+                    if (data.medicalData) {
+                        displayAPIUsage(data);
+                    }
                 } else {
                     addMessage('I apologize, but I encountered an error. Please try again or consult a healthcare professional if this is urgent.', 'bot');
                 }
@@ -838,7 +944,6 @@
             typingDiv.appendChild(typingContent);
             chatMessages.appendChild(typingDiv);
             
-            // Smooth scroll to typing indicator
             requestAnimationFrame(() => {
                 chatMessages.scrollTop = chatMessages.scrollHeight;
             });
@@ -868,7 +973,6 @@
             
             chatMessages.appendChild(messageDiv);
             
-            // Ensure smooth scrolling to bottom
             requestAnimationFrame(() => {
                 chatMessages.scrollTop = chatMessages.scrollHeight;
             });
@@ -900,14 +1004,12 @@
         const severityText = document.getElementById('severityText');
         const severityIndicator = document.getElementById('severityIndicator');
 
-        // Update severity in real-time as user drags
         severitySlider.addEventListener('input', function() {
             currentSeverity = parseInt(this.value);
             updateSeverityDisplay();
             updateSliderPosition();
         });
 
-        // Also update on change for accessibility
         severitySlider.addEventListener('change', function() {
             currentSeverity = parseInt(this.value);
             updateSeverityDisplay();
@@ -933,7 +1035,6 @@
         }
 
         function updateSliderPosition() {
-            // Calculate the position of the indicator based on slider value
             const percent = ((currentSeverity - 1) / 9) * 100;
             severityIndicator.style.left = `${percent}%`;
         }
@@ -949,7 +1050,6 @@
             button.disabled = true;
 
             try {
-                // Create a natural language description for the chat API
                 const symptomDescription = `I have ${selectedSymptoms.map(s => s.replace('_', ' ')).join(', ')}. The severity is ${currentSeverity} out of 10.`;
                 
                 const response = await fetch('/api/chat', {
@@ -975,12 +1075,21 @@
         function displayTrackerResults(result) {
             const resultsPanel = document.getElementById('trackerResults');
             
-            // Determine urgency based on response content
             let urgency = 'low';
             if (result.response.toLowerCase().includes('emergency') || result.response.toLowerCase().includes('call 911')) {
                 urgency = 'high';
             } else if (result.response.toLowerCase().includes('see a doctor') || result.response.toLowerCase().includes('healthcare provider')) {
                 urgency = 'medium';
+            }
+
+            let apiInfo = '';
+            if (result.medicalData && result.medicalData.databasesUsed && result.medicalData.databasesUsed.length > 0) {
+                apiInfo = `
+                    <div style="margin-top: 15px; padding: 15px; background: white; border-radius: 8px; border-left: 4px solid #2196f3;">
+                        <strong>🔍 Analysis used ${result.medicalData.databasesUsed.length} medical databases:</strong> ${result.medicalData.databasesUsed.join(', ')}<br>
+                        <strong>🎯 Confidence:</strong> ${result.medicalData.confidence.toUpperCase()}
+                    </div>
+                `;
             }
 
             resultsPanel.innerHTML = `
@@ -989,6 +1098,7 @@
                 </div>
                 <h3>Assessment Results</h3>
                 <p>${result.response}</p>
+                ${apiInfo}
                 <div style="margin-top: 15px; padding: 15px; background: white; border-radius: 8px; border-left: 4px solid #2196f3;">
                     <strong>💡 Tip:</strong> You can also use the chat assistant for more detailed questions about your symptoms.
                 </div>
@@ -996,7 +1106,6 @@
             
             resultsPanel.style.display = 'block';
             
-            // Smooth scroll to results with proper timing
             setTimeout(() => {
                 resultsPanel.scrollIntoView({ 
                     behavior: 'smooth', 
@@ -1005,10 +1114,19 @@
             }, 100);
         }
 
-        // Initialize
-        updateSeverityDisplay();
-        updateSliderPosition();
-        messageInput.focus();
+        // Initialize everything
+        function initialize() {
+            updateSeverityDisplay();
+            updateSliderPosition();
+            updateAPIStatus();
+            messageInput.focus();
+            
+            // Update API status every 30 seconds
+            setInterval(updateAPIStatus, 30000);
+        }
+
+        // Start the app
+        initialize();
     </script>
 </body>
 </html>

@@ -40,13 +40,15 @@ module.exports = {
         timeout: 8000
     },
 
-    // ClinicalTrials.gov API
+    // Updated clinicalTrial API
     clinicalTrials: {
-        baseUrl: 'https://clinicaltrials.gov/api/query',
+        baseUrl: 'https://clinicaltrials.gov/api/v2',
         endpoints: {
-            studyFields: '/study_fields',
-            fullStudies: '/full_studies'
+            studies: '/studies',
+            studyById: '/studies/{nctId}'
         },
+        // Only include working parameters
+        workingParams: ['query.cond', 'query.intr', 'query.titles', 'query.term', 'query.locn'],
         rateLimit: {
             requests: 15,
             perMinute: 1

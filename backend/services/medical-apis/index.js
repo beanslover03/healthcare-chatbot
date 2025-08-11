@@ -111,6 +111,16 @@ class MedicalAPIService {
             analysis.confidence = 'low';
         }
 
+        console.log('🔍 API USAGE SUMMARY:');
+        console.log(`   📊 Total APIs called: ${analysis.apiSources.length}`);
+        console.log(`   🎯 APIs used: ${analysis.apiSources.join(', ')}`);
+        console.log(`   💊 Medications found: ${analysis.medications?.length || 0}`);
+        console.log(`   🏥 Conditions found: ${analysis.conditions?.length || 0}`);
+        console.log(`   🔬 Clinical trials: ${analysis.clinicalTrials?.length || 0}`);
+        console.log(`   📚 Health info: ${analysis.healthInformation?.length || 0}`);
+        console.log(`   ⚠️  Safety data: ${analysis.drugSafety?.length || 0}`);
+        console.log(`   🎲 Confidence: ${analysis.confidence}`);
+
         return analysis;
     }
 
@@ -797,6 +807,43 @@ class MedicalAPIService {
     // Get cache statistics
     getCacheStats() {
         return this.cache.getStats();
+    }
+
+    // Add to end of existing MedicalAPIService class in index.js
+
+    // Initialize enhanced systems connection
+    initializeEnhancedSystems(claudeService) {
+        if (claudeService && claudeService.setMedicalAPIService) {
+            claudeService.setMedicalAPIService(this);
+            console.log('🔗 Enhanced systems connected to medical APIs');
+        }
+    }
+
+    // Enhanced symptom analysis with adaptive querying
+    async enhancedAnalyzeSymptoms(symptoms, userMessage, sessionId = 'default') {
+        console.log('🧠 Starting enhanced symptom analysis...');
+        
+        // Use existing analysis as base
+        const baseAnalysis = await this.analyzeSymptoms(symptoms, userMessage);
+        
+        // Enhance with adaptive intelligence if available
+        if (this.adaptiveQuery) {
+            try {
+                const adaptiveResults = await this.adaptiveQuery.intelligentSymptomAnalysis(
+                    userMessage, 
+                    [] // conversation history would come from session
+                );
+                
+                // Merge results
+                baseAnalysis.adaptiveInsights = adaptiveResults.synthesized;
+                baseAnalysis.queryStrategy = adaptiveResults.metadata.queryStrategy;
+                
+            } catch (error) {
+                console.warn('⚠️ Adaptive query enhancement failed:', error.message);
+            }
+        }
+        
+        return baseAnalysis;
     }
 }
 
