@@ -1,17 +1,16 @@
-// server.js - FIXED VERSION with proper medical API integration
+// backend/server.js - ENHANCED VERSION with all 5 medical databases
+
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
 require('dotenv').config();
 
-// Import the COMPREHENSIVE services (not the simple ones)
 const ClaudeService = require('./services/claude-service');
-const MedicalAPIService = require('./services/medical-apis'); // This is the comprehensive one
+const MedicalAPIService = require('./services/medical-apis'); // Now includes all 5 services
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Initialize services with error handling
 let claudeService, medicalAPI;
 
 async function initializeServices() {
@@ -20,14 +19,18 @@ async function initializeServices() {
         claudeService = new ClaudeService();
         console.log('✅ Claude service initialized');
         
-        console.log('🔍 Initializing Medical API service...');
+        console.log('🔍 Initializing Enhanced Medical API service...');
         medicalAPI = new MedicalAPIService();
-        console.log('✅ Medical API service initialized');
+        console.log('✅ Enhanced Medical API service initialized with 5 databases');
         
-        // Test medical APIs on startup
-        console.log('🧪 Testing medical API connections...');
+        // Test all medical APIs on startup
+        console.log('🧪 Testing enhanced medical API connections...');
         const apiStatus = await medicalAPI.getAPIStatus();
-        console.log('📊 API Status:', apiStatus);
+        console.log('📊 Enhanced API Status:', {
+            overall: apiStatus.overall,
+            services: Object.keys(apiStatus.services).length,
+            coverage: apiStatus.coverage
+        });
         
     } catch (error) {
         console.error('❌ Service initialization error:', error);
@@ -40,10 +43,8 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '../frontend')));
 
-// Simple conversation storage
 const conversationSessions = new Map();
 
-// Input validation middleware
 function validateInput(req, res, next) {
     const { message } = req.body;
     
@@ -65,14 +66,13 @@ function validateInput(req, res, next) {
     next();
 }
 
-// ENHANCED chat endpoint that actually uses medical databases
+// ENHANCED chat endpoint using ALL 5 medical databases
 app.post('/api/chat', validateInput, async (req, res) => {
     try {
         const { message, sessionId = 'default', source = 'chat' } = req.body;
         
         console.log(`💬 ${source.toUpperCase()}: "${message}"`);
         
-        // Get conversation history
         if (!conversationSessions.has(sessionId)) {
             conversationSessions.set(sessionId, []);
         }
@@ -82,29 +82,33 @@ app.post('/api/chat', validateInput, async (req, res) => {
         let urgency = 'normal';
         let medicalData = null;
 
-        // STEP 1: Check for emergency conditions first
+        // Emergency check first
         if (claudeService.isEmergency(message)) {
             console.log('🚨 Emergency detected');
             response = await claudeService.generateEmergencyResponse(message, history);
             urgency = 'emergency';
             
         } else {
-            // STEP 2: Get comprehensive medical analysis from databases
-            console.log('🔍 Analyzing symptoms with medical databases...');
+            // ENHANCED: Comprehensive medical analysis using ALL 5 databases
+            console.log('🔍 Analyzing symptoms with ALL medical databases...');
             try {
                 medicalData = await medicalAPI.analyzeSymptoms([], message);
-                console.log('📊 Medical analysis results:', {
+                console.log('📊 Enhanced medical analysis results:', {
                     symptomsFound: medicalData.symptoms?.length || 0,
                     conditionsFound: medicalData.conditions?.length || 0,
                     medicationsFound: medicalData.medications?.length || 0,
-                    apiSources: medicalData.apiSources
+                    clinicalTrialsFound: medicalData.clinicalTrials?.length || 0,
+                    healthInfoFound: medicalData.healthInformation?.length || 0,
+                    safetyDataFound: medicalData.drugSafety?.length || 0,
+                    apiSources: medicalData.apiSources,
+                    confidence: medicalData.confidence
                 });
             } catch (error) {
-                console.warn('⚠️ Medical API analysis failed:', error.message);
+                console.warn('⚠️ Enhanced medical API analysis failed:', error.message);
                 medicalData = { error: error.message };
             }
             
-            // STEP 3: Get Claude's assessment using medical data
+            // Claude assessment with enhanced medical data
             if (source === 'symptom_tracker') {
                 response = await claudeService.assessSymptoms(message, medicalData, history);
                 response = response.response || response;
@@ -113,16 +117,18 @@ app.post('/api/chat', validateInput, async (req, res) => {
                 response = await claudeService.generateEndingResponse(history);
                 urgency = 'ending';
             } else {
-                console.log('💭 Normal conversation with medical context');
+                console.log('💭 Normal conversation with enhanced medical context');
                 response = await claudeService.assessSymptoms(message, medicalData, history);
                 response = response.response || response;
             }
             
-            // Determine urgency from medical data
+            // Enhanced urgency determination
             if (medicalData && medicalData.emergencyFactors && medicalData.emergencyFactors.length > 0) {
                 urgency = 'high';
             } else if (medicalData && medicalData.conditions && medicalData.conditions.some(c => c.urgency === 'high')) {
                 urgency = 'medium';
+            } else if (medicalData && medicalData.confidence === 'very_high') {
+                urgency = 'low'; // High confidence in non-urgent condition
             }
         }
 
@@ -132,14 +138,13 @@ app.post('/api/chat', validateInput, async (req, res) => {
             { role: "assistant", content: response }
         );
 
-        // Keep history manageable
         if (history.length > 10) {
             history.splice(0, history.length - 10);
         }
 
         conversationSessions.set(sessionId, history);
 
-        console.log(`🤖 Response generated (urgency: ${urgency})`);
+        console.log(`🤖 Enhanced response generated (urgency: ${urgency}, confidence: ${medicalData?.confidence || 'unknown'})`);
 
         res.json({
             success: true,
@@ -150,13 +155,16 @@ app.post('/api/chat', validateInput, async (req, res) => {
             medicalData: medicalData ? {
                 symptomsAnalyzed: medicalData.symptoms?.length || 0,
                 databasesUsed: medicalData.apiSources || [],
-                confidence: medicalData.confidence || 'unknown'
+                confidence: medicalData.confidence || 'unknown',
+                clinicalTrialsAvailable: medicalData.clinicalTrials?.length || 0,
+                healthResourcesFound: medicalData.healthInformation?.length || 0,
+                safetyDataIncluded: medicalData.drugSafety?.length || 0
             } : null,
             timestamp: new Date().toISOString()
         });
 
     } catch (error) {
-        console.error('💥 Chat error:', error);
+        console.error('💥 Enhanced chat error:', error);
         
         let fallbackResponse = "I'm having trouble right now. For urgent medical concerns, please contact your healthcare provider or call 911.";
         
@@ -173,18 +181,19 @@ app.post('/api/chat', validateInput, async (req, res) => {
     }
 });
 
-// NEW: Medical database testing endpoint
+// ENHANCED: Comprehensive medical database testing endpoint
 app.post('/api/test-medical-apis', async (req, res) => {
     try {
         const { testType = 'all' } = req.body;
         
-        console.log(`🧪 Testing medical APIs (type: ${testType})`);
+        console.log(`🧪 Testing enhanced medical APIs (type: ${testType})`);
         
         const results = {
             timestamp: new Date().toISOString(),
             tests: []
         };
         
+        // Test RxNorm
         if (testType === 'all' || testType === 'rxnorm') {
             console.log('🧪 Testing RxNorm with aspirin search...');
             try {
@@ -195,8 +204,8 @@ app.post('/api/test-medical-apis', async (req, res) => {
                     success: rxnormResult.found,
                     details: {
                         found: rxnormResult.found,
-                        resultsCount: rxnormResult.rxnorm?.length || 0,
-                        hasInteractions: (rxnormResult.interactions?.length || 0) > 0
+                        interactions: rxnormResult.interactions?.length || 0,
+                        apiSources: rxnormResult.apiSources
                     }
                 });
             } catch (error) {
@@ -209,44 +218,124 @@ app.post('/api/test-medical-apis', async (req, res) => {
             }
         }
         
-        if (testType === 'all' || testType === 'symptom') {
-            console.log('🧪 Testing symptom analysis with headache...');
+        // Test Clinical Trials
+        if (testType === 'all' || testType === 'clinical_trials') {
+            console.log('🧪 Testing Clinical Trials with headache search...');
             try {
-                const symptomResult = await medicalAPI.analyzeSymptoms([], 'I have a severe headache with nausea');
+                const trialsResult = await medicalAPI.clinicalTrials.searchTrialsByCondition('headache');
                 results.tests.push({
-                    service: 'SymptomAnalysis',
-                    test: 'headache analysis',
-                    success: symptomResult.symptoms?.length > 0,
+                    service: 'ClinicalTrials.gov',
+                    test: 'headache trials',
+                    success: trialsResult.length > 0,
                     details: {
-                        symptomsFound: symptomResult.symptoms?.length || 0,
-                        conditionsFound: symptomResult.conditions?.length || 0,
-                        emergencyFactors: symptomResult.emergencyFactors?.length || 0,
-                        confidence: symptomResult.confidence
+                        trialsFound: trialsResult.length,
+                        recruitingTrials: trialsResult.filter(t => t.status === 'Recruiting').length
                     }
                 });
             } catch (error) {
                 results.tests.push({
-                    service: 'SymptomAnalysis',
-                    test: 'headache analysis',
+                    service: 'ClinicalTrials.gov',
+                    test: 'headache trials',
                     success: false,
                     error: error.message
                 });
             }
         }
         
-        if (testType === 'all' || testType === 'status') {
-            console.log('🧪 Getting API status...');
+        // Test MedlinePlus
+        if (testType === 'all' || testType === 'medlineplus') {
+            console.log('🧪 Testing MedlinePlus with fever search...');
             try {
-                const statusResult = await medicalAPI.getAPIStatus();
+                const healthResult = await medicalAPI.medlinePlus.searchHealthTopics('fever');
                 results.tests.push({
-                    service: 'APIStatus',
-                    test: 'health check',
-                    success: statusResult.overall === 'healthy',
-                    details: statusResult
+                    service: 'MedlinePlus',
+                    test: 'fever information',
+                    success: healthResult.length > 0,
+                    details: {
+                        topicsFound: healthResult.length
+                    }
                 });
             } catch (error) {
                 results.tests.push({
-                    service: 'APIStatus',
+                    service: 'MedlinePlus',
+                    test: 'fever information',
+                    success: false,
+                    error: error.message
+                });
+            }
+        }
+        
+        // Test OpenFDA
+        if (testType === 'all' || testType === 'openfda') {
+            console.log('🧪 Testing OpenFDA with ibuprofen search...');
+            try {
+                const fdaResult = await medicalAPI.openFDA.searchDrugLabels('ibuprofen');
+                results.tests.push({
+                    service: 'OpenFDA',
+                    test: 'ibuprofen safety data',
+                    success: fdaResult.length > 0,
+                    details: {
+                        labelsFound: fdaResult.length,
+                        hasWarnings: fdaResult.some(l => l.warnings)
+                    }
+                });
+            } catch (error) {
+                results.tests.push({
+                    service: 'OpenFDA',
+                    test: 'ibuprofen safety data',
+                    success: false,
+                    error: error.message
+                });
+            }
+        }
+        
+        // Test comprehensive symptom analysis
+        if (testType === 'all' || testType === 'symptom') {
+            console.log('🧪 Testing comprehensive symptom analysis...');
+            try {
+                const symptomResult = await medicalAPI.analyzeSymptoms([], 'I have a severe headache with nausea and fever');
+                results.tests.push({
+                    service: 'Comprehensive Analysis',
+                    test: 'multi-symptom analysis',
+                    success: symptomResult.symptoms?.length > 0,
+                    details: {
+                        symptomsFound: symptomResult.symptoms?.length || 0,
+                        conditionsFound: symptomResult.conditions?.length || 0,
+                        medicationsFound: symptomResult.medications?.length || 0,
+                        trialsFound: symptomResult.clinicalTrials?.length || 0,
+                        healthInfoFound: symptomResult.healthInformation?.length || 0,
+                        confidence: symptomResult.confidence,
+                        apiSources: symptomResult.apiSources
+                    }
+                });
+            } catch (error) {
+                results.tests.push({
+                    service: 'Comprehensive Analysis',
+                    test: 'multi-symptom analysis',
+                    success: false,
+                    error: error.message
+                });
+            }
+        }
+        
+        // Test API status
+        if (testType === 'all' || testType === 'status') {
+            console.log('🧪 Getting comprehensive API status...');
+            try {
+                const statusResult = await medicalAPI.getAPIStatus();
+                results.tests.push({
+                    service: 'API Status',
+                    test: 'health check',
+                    success: statusResult.overall !== 'degraded',
+                    details: {
+                        overall: statusResult.overall,
+                        serviceCount: Object.keys(statusResult.services).length,
+                        coverage: statusResult.coverage
+                    }
+                });
+            } catch (error) {
+                results.tests.push({
+                    service: 'API Status',
                     test: 'health check',
                     success: false,
                     error: error.message
@@ -257,16 +346,16 @@ app.post('/api/test-medical-apis', async (req, res) => {
         const successCount = results.tests.filter(t => t.success).length;
         const totalCount = results.tests.length;
         
-        console.log(`🧪 Medical API tests complete: ${successCount}/${totalCount} passed`);
+        console.log(`🧪 Enhanced medical API tests complete: ${successCount}/${totalCount} passed`);
         
         res.json({
             success: true,
-            summary: `${successCount}/${totalCount} tests passed`,
+            summary: `${successCount}/${totalCount} enhanced tests passed`,
             results: results
         });
         
     } catch (error) {
-        console.error('🧪 Medical API test error:', error);
+        console.error('🧪 Enhanced medical API test error:', error);
         res.json({
             success: false,
             error: error.message
@@ -274,7 +363,7 @@ app.post('/api/test-medical-apis', async (req, res) => {
     }
 });
 
-// Enhanced health check with medical API status
+// Enhanced health check with all 5 medical APIs
 app.get('/api/health', async (req, res) => {
     try {
         const claudeHealth = await claudeService.healthCheck();
@@ -293,8 +382,22 @@ app.get('/api/health', async (req, res) => {
                 symptom_tracker: true,
                 rxnorm_integration: apiStatus.services?.rxnorm?.status === 'healthy',
                 fhir_integration: apiStatus.services?.fhir?.status === 'healthy',
+                clinical_trials_integration: apiStatus.services?.clinicalTrials?.status === 'healthy',
+                medlineplus_integration: apiStatus.services?.medlinePlus?.status === 'healthy',
+                openfda_integration: apiStatus.services?.openFDA?.status === 'healthy',
                 emergency_detection: true,
-                medication_lookup: true
+                comprehensive_medication_lookup: true,
+                safety_data_integration: true,
+                clinical_trial_matching: true,
+                health_education_resources: true
+            },
+            coverage: apiStatus.coverage,
+            confidence: {
+                drug_information: apiStatus.coverage.drugDatabase,
+                condition_information: apiStatus.coverage.conditionDatabase,
+                safety_information: apiStatus.coverage.safetyDatabase,
+                treatment_options: apiStatus.coverage.clinicalTrials,
+                educational_resources: apiStatus.coverage.healthEducation
             }
         });
 
@@ -307,7 +410,107 @@ app.get('/api/health', async (req, res) => {
     }
 });
 
-// Keep other endpoints...
+// NEW: Comprehensive medication lookup endpoint
+app.post('/api/medication-lookup', async (req, res) => {
+    try {
+        const { medication } = req.body;
+        
+        if (!medication) {
+            return res.json({
+                success: false,
+                error: 'Medication name is required'
+            });
+        }
+        
+        console.log(`💊 Comprehensive medication lookup: ${medication}`);
+        
+        const results = await medicalAPI.comprehensiveMedicationLookup(medication);
+        
+        res.json({
+            success: results.found,
+            medication: medication,
+            data: results,
+            sources: results.apiSources,
+            safetyWarnings: results.warnings,
+            recommendations: results.recommendations,
+            timestamp: new Date().toISOString()
+        });
+        
+    } catch (error) {
+        console.error('Medication lookup error:', error);
+        res.json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+// NEW: Clinical trials search endpoint
+app.post('/api/clinical-trials', async (req, res) => {
+    try {
+        const { condition, limit = 5 } = req.body;
+        
+        if (!condition) {
+            return res.json({
+                success: false,
+                error: 'Condition is required'
+            });
+        }
+        
+        console.log(`🔬 Clinical trials search: ${condition}`);
+        
+        const trials = await medicalAPI.clinicalTrials.searchTrialsByCondition(condition, { limit });
+        
+        res.json({
+            success: trials.length > 0,
+            condition: condition,
+            trials: trials,
+            recruiting: trials.filter(t => t.status === 'Recruiting'),
+            timestamp: new Date().toISOString()
+        });
+        
+    } catch (error) {
+        console.error('Clinical trials search error:', error);
+        res.json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+// NEW: Health information endpoint
+app.post('/api/health-info', async (req, res) => {
+    try {
+        const { topic } = req.body;
+        
+        if (!topic) {
+            return res.json({
+                success: false,
+                error: 'Health topic is required'
+            });
+        }
+        
+        console.log(`📚 Health information search: ${topic}`);
+        
+        const healthInfo = await medicalAPI.medlinePlus.searchHealthTopics(topic);
+        
+        res.json({
+            success: healthInfo.length > 0,
+            topic: topic,
+            information: healthInfo,
+            timestamp: new Date().toISOString()
+        });
+        
+    } catch (error) {
+        console.error('Health information search error:', error);
+        res.json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+// Keep existing endpoints
 app.get('/api/session/:sessionId/context', (req, res) => {
     const sessionId = req.params.sessionId;
     const history = conversationSessions.get(sessionId) || [];
@@ -356,6 +559,9 @@ app.use((req, res, next) => {
             availableEndpoints: [
                 'POST /api/chat',
                 'POST /api/test-medical-apis',
+                'POST /api/medication-lookup',
+                'POST /api/clinical-trials', 
+                'POST /api/health-info',
                 'GET /api/health',
                 'GET /api/emergency-contacts'
             ]
@@ -370,22 +576,28 @@ async function startServer() {
     await initializeServices();
     
     app.listen(PORT, () => {
-        console.log(`🏥 Healthcare Chatbot running on http://localhost:${PORT}`);
-        console.log('✅ FEATURES:');
-        console.log('   💬 Enhanced Chat - Uses medical databases for context');
-        console.log('   📋 Smart Symptom Tracker - Database-backed analysis');
-        console.log('   💊 RxNorm Integration - Real medication data');
+        console.log(`🏥 Enhanced Healthcare Chatbot running on http://localhost:${PORT}`);
+        console.log('✅ ENHANCED FEATURES:');
+        console.log('   💬 AI Chat - Uses 5 medical databases for context');
+        console.log('   📋 Smart Symptom Tracker - Multi-database analysis');
+        console.log('   💊 RxNorm Integration - Comprehensive drug database');
         console.log('   🏥 FHIR Integration - Healthcare standards compliance');
-        console.log('   🚨 Emergency Detection - Pattern-based triage');
-        console.log('   🧪 API Testing - /api/test-medical-apis endpoint');
+        console.log('   🔬 Clinical Trials - Research opportunities');
+        console.log('   📚 MedlinePlus - Health education resources');
+        console.log('   ⚠️  OpenFDA - Drug safety and adverse events');
+        console.log('   🚨 Emergency Detection - Advanced pattern matching');
+        console.log('   🧪 Comprehensive Testing - All API endpoints');
         console.log(`🔑 Claude API: ${process.env.ANTHROPIC_API_KEY ? 'Configured' : 'Missing'}`);
         console.log(`🌐 Access: http://localhost:${PORT}`);
-        console.log(`🧪 Test APIs: http://localhost:${PORT}/api/test-medical-apis`);
+        console.log(`🧪 Test Enhanced APIs: POST http://localhost:${PORT}/api/test-medical-apis`);
+        console.log(`💊 Medication Lookup: POST http://localhost:${PORT}/api/medication-lookup`);
+        console.log(`🔬 Clinical Trials: POST http://localhost:${PORT}/api/clinical-trials`);
+        console.log(`📚 Health Info: POST http://localhost:${PORT}/api/health-info`);
     });
 }
 
 startServer().catch(error => {
-    console.error('Failed to start server:', error);
+    console.error('Failed to start enhanced server:', error);
     process.exit(1);
 });
 

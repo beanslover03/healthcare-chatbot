@@ -1,8 +1,9 @@
 // backend/services/medical-apis/index.js
-// Main Medical API Service - Coordinates all medical database services
+// Enhanced Main Medical API Service - Now with Clinical Trials, MedlinePlus, and OpenFDA
 
 const RxNormService = require('./rxnorm-service');
 const FHIRService = require('./fhir-service');
+const { ClinicalTrialsService, MedlinePlusService, OpenFDAService } = require('./enhanced-medical-services');
 const CacheManager = require('../utils/cache-manager');
 const medicalMappings = require('../../config/medical-mappings');
 
@@ -11,30 +12,39 @@ class MedicalAPIService {
         // Initialize cache manager
         this.cache = new CacheManager();
         
-        // Initialize individual services
+        // Initialize all medical services
         this.rxnorm = new RxNormService(this.cache);
         this.fhir = new FHIRService(this.cache);
+        this.clinicalTrials = new ClinicalTrialsService(this.cache);
+        this.medlinePlus = new MedlinePlusService(this.cache);
+        this.openFDA = new OpenFDAService(this.cache);
         
         // Service status tracking
         this.serviceStatus = {
             rxnorm: 'unknown',
             fhir: 'unknown',
+            clinicalTrials: 'unknown',
+            medlinePlus: 'unknown',
+            openFDA: 'unknown',
             lastHealthCheck: null
         };
         
-        console.log('🏥 Medical API Service initialized with cache management');
+        console.log('🏥 Enhanced Medical API Service initialized with 5 databases');
     }
 
-    // ===== MAIN PUBLIC METHODS =====
+    // ===== ENHANCED SYMPTOM ANALYSIS =====
 
     async analyzeSymptoms(symptoms, userMessage) {
-        console.log('🔍 Starting comprehensive symptom analysis...');
+        console.log('🔍 Starting comprehensive symptom analysis with enhanced databases...');
         
         const analysis = {
             userMessage,
             symptoms: await this.identifyAndEnrichSymptoms(userMessage),
             conditions: [],
             medications: [],
+            clinicalTrials: [],
+            healthInformation: [],
+            drugSafety: [],
             emergencyFactors: [],
             recommendations: {},
             apiSources: [],
@@ -43,49 +53,68 @@ class MedicalAPIService {
         };
 
         try {
-            // 1. Enrich identified symptoms with medical database data
+            // 1. Enrich identified symptoms with ALL medical databases
             for (const symptom of analysis.symptoms) {
-                console.log(`📋 Enriching symptom: ${symptom.name}`);
+                console.log(`📋 Comprehensively enriching symptom: ${symptom.name}`);
                 
-                // Get related conditions from FHIR
-                const fhirConditions = await this.fhir.searchConditions(symptom.name);
+                // Parallel database queries for speed
+                const [fhirConditions, healthInfo, trials] = await Promise.all([
+                    this.fhir.searchConditions(symptom.name).catch(e => []),
+                    this.medlinePlus.searchHealthTopics(symptom.name).catch(e => []),
+                    this.clinicalTrials.searchTrialsByCondition(symptom.name).catch(e => [])
+                ]);
+                
+                // Add results
                 if (fhirConditions.length > 0) {
                     analysis.conditions.push(...fhirConditions.slice(0, 3));
                     analysis.apiSources.push('FHIR-Conditions');
                 }
                 
-                // Get medication recommendations
-                const medications = await this.getMedicationRecommendations(symptom);
+                if (healthInfo.length > 0) {
+                    analysis.healthInformation.push(...healthInfo);
+                    analysis.apiSources.push('MedlinePlus');
+                }
+                
+                if (trials.length > 0) {
+                    analysis.clinicalTrials.push(...trials.slice(0, 2));
+                    analysis.apiSources.push('ClinicalTrials.gov');
+                }
+                
+                // Get enhanced medication recommendations
+                const medications = await this.getEnhancedMedicationRecommendations(symptom);
                 if (medications.length > 0) {
                     analysis.medications.push(...medications);
-                    analysis.apiSources.push('RxNorm-Medications');
                 }
             }
 
-            // 2. Emergency assessment
+            // 2. Emergency assessment (unchanged)
             analysis.emergencyFactors = this.assessEmergencyFactors(analysis.symptoms, userMessage);
             
-            // 3. Generate recommendations
-            analysis.recommendations = await this.generateRecommendations(analysis);
+            // 3. Enhanced recommendations with new data sources
+            analysis.recommendations = await this.generateEnhancedRecommendations(analysis);
             
-            // 4. Calculate confidence
-            analysis.confidence = this.calculateConfidence(analysis);
+            // 4. Calculate enhanced confidence
+            analysis.confidence = this.calculateEnhancedConfidence(analysis);
             
             // Remove duplicates and limit results
             analysis.conditions = this.removeDuplicates(analysis.conditions, 'id').slice(0, 5);
             analysis.medications = this.removeDuplicates(analysis.medications, 'name').slice(0, 8);
+            analysis.healthInformation = this.removeDuplicates(analysis.healthInformation, 'title').slice(0, 3);
+            analysis.clinicalTrials = this.removeDuplicates(analysis.clinicalTrials, 'id').slice(0, 3);
             analysis.apiSources = [...new Set(analysis.apiSources)];
             
-            console.log(`✅ Analysis complete. Found ${analysis.symptoms.length} symptoms, ${analysis.conditions.length} conditions, ${analysis.medications.length} medications`);
+            console.log(`✅ Enhanced analysis complete. Sources: ${analysis.apiSources.join(', ')}`);
             
         } catch (error) {
-            console.error('❌ Error in symptom analysis:', error);
+            console.error('❌ Error in enhanced symptom analysis:', error);
             analysis.error = error.message;
             analysis.confidence = 'low';
         }
 
         return analysis;
     }
+
+    // ===== ENHANCED MEDICATION LOOKUP =====
 
     async comprehensiveMedicationLookup(medicationName) {
         console.log(`💊 Starting comprehensive medication lookup for: ${medicationName}`);
@@ -95,18 +124,25 @@ class MedicalAPIService {
             found: false,
             rxnorm: {},
             fhir: {},
+            openFDA: {
+                labels: [],
+                adverseEvents: []
+            },
             interactions: [],
             recommendations: [],
             warnings: [],
+            safetyInfo: [],
             apiSources: [],
             timestamp: new Date().toISOString()
         };
 
         try {
-            // Search both RxNorm and FHIR in parallel
-            const [rxnormData, fhirData] = await Promise.all([
+            // Search all databases in parallel for speed
+            const [rxnormData, fhirData, fdaLabels, fdaEvents] = await Promise.all([
                 this.rxnorm.comprehensiveDrugLookup(medicationName),
-                this.fhir.searchMedications(medicationName)
+                this.fhir.searchMedications(medicationName),
+                this.openFDA.searchDrugLabels(medicationName).catch(e => []),
+                this.openFDA.searchDrugEvents(medicationName).catch(e => [])
             ]);
 
             // Process RxNorm results
@@ -127,32 +163,399 @@ class MedicalAPIService {
                 results.apiSources.push('FHIR');
             }
 
-            // Generate warnings and recommendations
-            if (results.found) {
-                results.warnings = this.generateMedicationWarnings(medicationName, results);
-                results.recommendations = this.generateMedicationRecommendations(medicationName, results);
+            // Process OpenFDA results
+            if (fdaLabels.length > 0) {
+                results.found = true;
+                results.openFDA.labels = fdaLabels;
+                results.apiSources.push('OpenFDA-Labels');
             }
 
-            console.log(`✅ Medication lookup complete. Found in ${results.apiSources.join(', ')}`);
+            if (fdaEvents.length > 0) {
+                results.openFDA.adverseEvents = fdaEvents;
+                results.apiSources.push('OpenFDA-Events');
+            }
+
+            // Generate enhanced warnings and recommendations
+            if (results.found) {
+                results.warnings = this.generateEnhancedMedicationWarnings(medicationName, results);
+                results.recommendations = this.generateEnhancedMedicationRecommendations(medicationName, results);
+                results.safetyInfo = this.compileSafetyInformation(results);
+            }
+
+            console.log(`✅ Enhanced medication lookup complete. Found in ${results.apiSources.join(', ')}`);
             
         } catch (error) {
-            console.error('❌ Error in medication lookup:', error);
+            console.error('❌ Error in enhanced medication lookup:', error);
             results.error = error.message;
         }
 
         return results;
     }
 
-    // ===== SYMPTOM IDENTIFICATION AND ENRICHMENT =====
+    // ===== ENHANCED MEDICATION RECOMMENDATIONS =====
+
+    async getEnhancedMedicationRecommendations(symptom) {
+        const recommendations = [];
+        
+        try {
+            // Get OTC recommendations (existing)
+            const otcMeds = this.getOTCRecommendations(symptom.id);
+            recommendations.push(...otcMeds);
+            
+            // Search for prescription alternatives with safety data
+            const searchTerms = [
+                `${symptom.name} treatment`,
+                `${symptom.name} medication`
+            ];
+            
+            for (const term of searchTerms) {
+                try {
+                    const rxnormResults = await this.rxnorm.searchDrugs(term);
+                    for (const med of rxnormResults.slice(0, 2)) {
+                        // Get FDA safety data for this medication
+                        const safetyData = await this.openFDA.searchDrugEvents(med.name).catch(() => []);
+                        
+                        recommendations.push({
+                            name: med.name,
+                            type: 'prescription',
+                            rxcui: med.rxcui,
+                            source: 'RxNorm',
+                            indication: symptom.name,
+                            safetyProfile: safetyData.length > 0 ? 'FDA data available' : 'Limited safety data',
+                            adverseEvents: safetyData.slice(0, 3)
+                        });
+                    }
+                } catch (error) {
+                    console.warn(`Failed to get enhanced medication data for ${term}:`, error.message);
+                }
+            }
+            
+        } catch (error) {
+            console.error('Error getting enhanced medication recommendations:', error);
+        }
+
+        return recommendations;
+    }
+
+    // ===== ENHANCED RECOMMENDATIONS =====
+
+    async generateEnhancedRecommendations(analysis) {
+        const recommendations = {
+            immediateActions: [],
+            selfCare: [],
+            whenToSeekCare: [],
+            medications: [],
+            lifestyle: [],
+            additionalResources: [],
+            clinicalOptions: []
+        };
+
+        // Emergency recommendations (unchanged)
+        if (analysis.emergencyFactors.length > 0) {
+            recommendations.immediateActions.push('Seek immediate medical attention');
+            recommendations.immediateActions.push('Call 911 if symptoms are severe');
+            return recommendations;
+        }
+
+        // Enhanced recommendations using new data sources
+        for (const symptom of analysis.symptoms) {
+            // Self-care from existing mappings
+            const selfCare = this.getSymptomSelfCare(symptom.id);
+            recommendations.selfCare.push(...selfCare);
+
+            // When to seek care (enhanced)
+            const seekCare = this.getEnhancedSeekCareGuidance(symptom, analysis);
+            recommendations.whenToSeekCare.push(...seekCare);
+        }
+
+        // Add MedlinePlus educational resources
+        if (analysis.healthInformation.length > 0) {
+            for (const info of analysis.healthInformation) {
+                recommendations.additionalResources.push({
+                    type: 'educational',
+                    title: info.title,
+                    summary: info.summary,
+                    source: 'MedlinePlus'
+                });
+            }
+        }
+
+        // Add clinical trial options
+        if (analysis.clinicalTrials.length > 0) {
+            for (const trial of analysis.clinicalTrials) {
+                if (trial.status === 'Recruiting') {
+                    recommendations.clinicalOptions.push({
+                        type: 'clinical_trial',
+                        title: trial.title,
+                        phase: trial.phase,
+                        condition: trial.condition,
+                        source: 'ClinicalTrials.gov'
+                    });
+                }
+            }
+        }
+
+        // Medication recommendations (already enhanced)
+        recommendations.medications = analysis.medications.slice(0, 5);
+
+        // Remove duplicates
+        recommendations.selfCare = [...new Set(recommendations.selfCare)];
+        recommendations.whenToSeekCare = [...new Set(recommendations.whenToSeekCare)];
+
+        return recommendations;
+    }
+
+    // ===== ENHANCED SAFETY INFORMATION =====
+
+    compileSafetyInformation(medicationResults) {
+        const safetyInfo = [];
+        
+        // From OpenFDA labels
+        if (medicationResults.openFDA.labels.length > 0) {
+            for (const label of medicationResults.openFDA.labels) {
+                if (label.warnings) {
+                    safetyInfo.push({
+                        type: 'warning',
+                        content: label.warnings,
+                        source: 'FDA Label'
+                    });
+                }
+                if (label.contraindications) {
+                    safetyInfo.push({
+                        type: 'contraindication',
+                        content: label.contraindications,
+                        source: 'FDA Label'
+                    });
+                }
+            }
+        }
+        
+        // From adverse events
+        if (medicationResults.openFDA.adverseEvents.length > 0) {
+            const commonEvents = medicationResults.openFDA.adverseEvents
+                .filter(event => event.frequency === 'Common')
+                .slice(0, 3);
+                
+            if (commonEvents.length > 0) {
+                safetyInfo.push({
+                    type: 'adverse_events',
+                    content: `Common reported reactions: ${commonEvents.map(e => e.reaction).join(', ')}`,
+                    source: 'FDA Adverse Event Reports'
+                });
+            }
+        }
+        
+        return safetyInfo;
+    }
+
+    // ===== ENHANCED CONFIDENCE CALCULATION =====
+
+    calculateEnhancedConfidence(analysis) {
+        let score = 0;
+        
+        // Base score from number of symptoms identified
+        score += analysis.symptoms.length * 20;
+        
+        // Bonus for detailed symptom information
+        for (const symptom of analysis.symptoms) {
+            if (symptom.severity !== 'unknown') score += 10;
+            if (symptom.duration.type !== 'unknown') score += 10;
+            if (symptom.associatedSymptoms.length > 0) score += 5;
+        }
+        
+        // Enhanced bonus for multiple database matches
+        if (analysis.conditions.length > 0) score += 15;
+        if (analysis.medications.length > 0) score += 10;
+        if (analysis.healthInformation.length > 0) score += 15; // NEW: MedlinePlus data
+        if (analysis.clinicalTrials.length > 0) score += 10; // NEW: Clinical trials
+        if (analysis.apiSources.includes('OpenFDA-Labels')) score += 12; // NEW: FDA data
+        if (analysis.apiSources.includes('OpenFDA-Events')) score += 8; // NEW: Safety data
+        
+        // Bonus for multiple API sources (cross-validation)
+        const uniqueSources = [...new Set(analysis.apiSources)];
+        if (uniqueSources.length >= 3) score += 20;
+        if (uniqueSources.length >= 4) score += 10;
+        if (uniqueSources.length >= 5) score += 10;
+        
+        // Cap at 100 and convert to confidence level
+        score = Math.min(score, 100);
+        
+        if (score >= 85) return 'very_high';
+        if (score >= 70) return 'high';
+        if (score >= 50) return 'medium';
+        return 'low';
+    }
+
+    // ===== ENHANCED WARNING GENERATION =====
+
+    generateEnhancedMedicationWarnings(medicationName, results) {
+        const warnings = [];
+        
+        // From FDA labels
+        if (results.openFDA.labels.length > 0) {
+            for (const label of results.openFDA.labels) {
+                if (label.warnings) {
+                    warnings.push(`FDA Warning: ${label.warnings.substring(0, 200)}...`);
+                }
+            }
+        }
+        
+        // From adverse events data
+        if (results.openFDA.adverseEvents.length > 0) {
+            const seriousEvents = results.openFDA.adverseEvents
+                .filter(event => event.frequency === 'Common' && event.reportCount > 10);
+            
+            if (seriousEvents.length > 0) {
+                warnings.push(`Common reported reactions include: ${seriousEvents.slice(0, 3).map(e => e.reaction).join(', ')}`);
+            }
+        }
+        
+        // Check interactions from RxNorm
+        if (results.interactions && results.interactions.length > 0) {
+            warnings.push(`Has ${results.interactions.length} known drug interactions`);
+        }
+        
+        // Generic warnings
+        warnings.push('Always consult healthcare provider before starting new medications');
+        warnings.push('Check with pharmacist about drug interactions');
+        
+        return warnings;
+    }
+
+    generateEnhancedMedicationRecommendations(medicationName, results) {
+        const recommendations = [];
+        
+        // From FDA label data
+        if (results.openFDA.labels.length > 0) {
+            const label = results.openFDA.labels[0];
+            if (label.dosageAndAdministration) {
+                recommendations.push(`Dosage guidance available in FDA labeling`);
+            }
+        }
+        
+        recommendations.push('Discuss with your doctor or pharmacist');
+        recommendations.push('Follow prescribed dosage instructions');
+        recommendations.push('Report any side effects to your healthcare provider');
+        recommendations.push('Monitor for the reported adverse reactions');
+        
+        return recommendations;
+    }
+
+    // ===== ENHANCED SEEK CARE GUIDANCE =====
+
+    getEnhancedSeekCareGuidance(symptom, analysis) {
+        const guidance = [];
+        
+        if (symptom.severity === 'severe') {
+            guidance.push('Seek medical attention for severe symptoms');
+        }
+        
+        if (symptom.duration && symptom.duration.type === 'chronic') {
+            guidance.push('Consult healthcare provider for persistent symptoms');
+        }
+        
+        if (symptom.urgencyFactors && symptom.urgencyFactors.length > 0) {
+            guidance.push('Contact healthcare provider due to concerning features');
+        }
+        
+        // Enhanced guidance based on available clinical trials
+        if (analysis.clinicalTrials.length > 0) {
+            const recruitingTrials = analysis.clinicalTrials.filter(t => t.status === 'Recruiting');
+            if (recruitingTrials.length > 0) {
+                guidance.push('Clinical trials may be available for your condition');
+            }
+        }
+        
+        // Enhanced guidance based on health information
+        if (analysis.healthInformation.length > 0) {
+            guidance.push('Educational resources available from MedlinePlus');
+        }
+
+        return guidance;
+    }
+
+    // ===== ENHANCED API STATUS =====
+
+    async getAPIStatus() {
+        console.log('🔍 Checking enhanced medical API status...');
+        
+        const status = {
+            timestamp: new Date().toISOString(),
+            overall: 'healthy',
+            services: {},
+            cache: this.cache.getStats(),
+            coverage: {
+                drugDatabase: 0,
+                conditionDatabase: 0,
+                safetyDatabase: 0,
+                clinicalTrials: 0,
+                healthEducation: 0
+            }
+        };
+
+        // Check all services in parallel
+        const [rxnormStatus, fhirStatus, clinicalTrialsStatus, medlinePlusStatus, openFDAStatus] = await Promise.all([
+            this.rxnorm.healthCheck(),
+            this.fhir.healthCheck(),
+            this.clinicalTrials.healthCheck(),
+            this.medlinePlus.healthCheck(),
+            this.openFDA.healthCheck()
+        ]);
+
+        status.services.rxnorm = rxnormStatus;
+        status.services.fhir = fhirStatus;
+        status.services.clinicalTrials = clinicalTrialsStatus;
+        status.services.medlinePlus = medlinePlusStatus;
+        status.services.openFDA = openFDAStatus;
+
+        // Calculate coverage scores
+        status.coverage.drugDatabase = this.calculateCoverage([rxnormStatus, fhirStatus]);
+        status.coverage.conditionDatabase = this.calculateCoverage([fhirStatus, medlinePlusStatus]);
+        status.coverage.safetyDatabase = this.calculateCoverage([openFDAStatus]);
+        status.coverage.clinicalTrials = this.calculateCoverage([clinicalTrialsStatus]);
+        status.coverage.healthEducation = this.calculateCoverage([medlinePlusStatus]);
+
+        // Update overall status
+        const healthyServices = Object.values(status.services).filter(s => s.status === 'healthy').length;
+        const totalServices = Object.keys(status.services).length;
+        
+        if (healthyServices === totalServices) {
+            status.overall = 'excellent';
+        } else if (healthyServices >= totalServices * 0.8) {
+            status.overall = 'good';
+        } else if (healthyServices >= totalServices * 0.6) {
+            status.overall = 'fair';
+        } else {
+            status.overall = 'degraded';
+        }
+
+        this.serviceStatus = {
+            rxnorm: rxnormStatus.status,
+            fhir: fhirStatus.status,
+            clinicalTrials: clinicalTrialsStatus.status,
+            medlinePlus: medlinePlusStatus.status,
+            openFDA: openFDAStatus.status,
+            lastHealthCheck: new Date().toISOString()
+        };
+
+        return status;
+    }
+
+    calculateCoverage(serviceStatuses) {
+        const healthyCount = serviceStatuses.filter(s => s.status === 'healthy').length;
+        return Math.round((healthyCount / serviceStatuses.length) * 100);
+    }
+
+    // ===== UTILITY METHODS (Inherited from original) =====
 
     async identifyAndEnrichSymptoms(message) {
+        // Keep existing implementation
         const identifiedSymptoms = [];
         const messageLower = message.toLowerCase();
 
         console.log('🔍 Identifying symptoms in message...');
 
         for (const [symptomId, mapping] of Object.entries(medicalMappings.symptoms)) {
-            // Check if symptom is mentioned
             const mentioned = mapping.keywords.some(keyword => messageLower.includes(keyword)) ||
                             messageLower.includes(symptomId.replace('_', ' '));
 
@@ -179,57 +582,16 @@ class MedicalAPIService {
         return identifiedSymptoms;
     }
 
-    // ===== MEDICATION RECOMMENDATIONS =====
-
-    async getMedicationRecommendations(symptom) {
-        const recommendations = [];
-        
-        try {
-            // Get OTC recommendations from mappings
-            const otcMeds = this.getOTCRecommendations(symptom.id);
-            recommendations.push(...otcMeds);
-            
-            // Search for prescription alternatives in databases
-            const searchTerms = [
-                `${symptom.name} treatment`,
-                `${symptom.name} medication`
-            ];
-            
-            for (const term of searchTerms) {
-                try {
-                    const rxnormResults = await this.rxnorm.searchDrugs(term);
-                    for (const med of rxnormResults.slice(0, 3)) {
-                        recommendations.push({
-                            name: med.name,
-                            type: 'prescription',
-                            rxcui: med.rxcui,
-                            source: 'RxNorm',
-                            indication: symptom.name
-                        });
-                    }
-                } catch (error) {
-                    console.warn(`Failed to get RxNorm data for ${term}:`, error.message);
-                }
-            }
-            
-        } catch (error) {
-            console.error('Error getting medication recommendations:', error);
-        }
-
-        return recommendations;
-    }
-
     getOTCRecommendations(symptomId) {
         const recommendations = [];
         
-        // Map symptoms to medication categories
         const symptomToCategory = {
             'headache': ['pain_relievers'],
             'fever': ['pain_relievers'],
             'nausea': ['anti_nausea'],
             'cough': ['cough_suppressants'],
-            'fatigue': [], // No specific OTC for fatigue
-            'dizziness': [] // No specific OTC for dizziness
+            'fatigue': [],
+            'dizziness': []
         };
 
         const categories = symptomToCategory[symptomId] || [];
@@ -255,15 +617,12 @@ class MedicalAPIService {
         return recommendations;
     }
 
-    // ===== EMERGENCY ASSESSMENT =====
-
     assessEmergencyFactors(symptoms, message) {
         const emergencyFactors = [];
         const messageLower = message.toLowerCase();
 
         console.log('🚨 Assessing emergency factors...');
 
-        // Check for emergency patterns from mappings
         for (const [conditionId, pattern] of Object.entries(medicalMappings.emergencyPatterns)) {
             const hasKeywords = pattern.keywords.some(keyword => messageLower.includes(keyword));
             const hasSymptoms = pattern.symptoms.some(symptom => 
@@ -282,7 +641,6 @@ class MedicalAPIService {
             }
         }
 
-        // Check individual symptom urgency factors
         for (const symptom of symptoms) {
             if (symptom.urgencyFactors && symptom.urgencyFactors.length > 0) {
                 emergencyFactors.push({
@@ -295,45 +653,6 @@ class MedicalAPIService {
         }
 
         return emergencyFactors;
-    }
-
-    // ===== RECOMMENDATION GENERATION =====
-
-    async generateRecommendations(analysis) {
-        const recommendations = {
-            immediateActions: [],
-            selfCare: [],
-            whenToSeekCare: [],
-            medications: [],
-            lifestyle: []
-        };
-
-        // Emergency recommendations
-        if (analysis.emergencyFactors.length > 0) {
-            recommendations.immediateActions.push('Seek immediate medical attention');
-            recommendations.immediateActions.push('Call 911 if symptoms are severe');
-            return recommendations;
-        }
-
-        // Symptom-specific recommendations
-        for (const symptom of analysis.symptoms) {
-            // Self-care recommendations
-            const selfCare = this.getSymptomSelfCare(symptom.id);
-            recommendations.selfCare.push(...selfCare);
-
-            // When to seek care
-            const seekCare = this.getSeekCareGuidance(symptom);
-            recommendations.whenToSeekCare.push(...seekCare);
-        }
-
-        // Medication recommendations (already in analysis.medications)
-        recommendations.medications = analysis.medications.slice(0, 5);
-
-        // Remove duplicates
-        recommendations.selfCare = [...new Set(recommendations.selfCare)];
-        recommendations.whenToSeekCare = [...new Set(recommendations.whenToSeekCare)];
-
-        return recommendations;
     }
 
     getSymptomSelfCare(symptomId) {
@@ -367,26 +686,6 @@ class MedicalAPIService {
         return selfCareMap[symptomId] || ['Monitor symptoms and rest'];
     }
 
-    getSeekCareGuidance(symptom) {
-        const guidance = [];
-        
-        if (symptom.severity === 'severe') {
-            guidance.push('Seek medical attention for severe symptoms');
-        }
-        
-        if (symptom.duration && symptom.duration.type === 'chronic') {
-            guidance.push('Consult healthcare provider for persistent symptoms');
-        }
-        
-        if (symptom.urgencyFactors && symptom.urgencyFactors.length > 0) {
-            guidance.push('Contact healthcare provider due to concerning features');
-        }
-
-        return guidance;
-    }
-
-    // ===== UTILITY METHODS =====
-
     extractSeverity(message, severityClues) {
         if (!severityClues) return 'unknown';
         
@@ -396,7 +695,6 @@ class MedicalAPIService {
             }
         }
         
-        // Look for numerical ratings
         const ratingMatch = message.match(/(\d+)\s*(?:out of|\/)\s*10/);
         if (ratingMatch) {
             const rating = parseInt(ratingMatch[1]);
@@ -415,7 +713,6 @@ class MedicalAPIService {
             }
         }
 
-        // Look for specific time periods
         const timePatterns = [
             { pattern: /(\d+)\s*(hour|hr)s?/i, unit: 'hours' },
             { pattern: /(\d+)\s*(day)s?/i, unit: 'days' },
@@ -451,7 +748,6 @@ class MedicalAPIService {
     extractSymptomContext(message, symptomId) {
         const context = {};
         
-        // Check for triggers
         const triggers = {
             'stress': /stress|anxiety|worry/i,
             'activity': /exercise|activity|movement/i,
@@ -480,31 +776,6 @@ class MedicalAPIService {
         return found;
     }
 
-    calculateConfidence(analysis) {
-        let score = 0;
-        
-        // Base score from number of symptoms identified
-        score += analysis.symptoms.length * 20;
-        
-        // Bonus for detailed symptom information
-        for (const symptom of analysis.symptoms) {
-            if (symptom.severity !== 'unknown') score += 10;
-            if (symptom.duration.type !== 'unknown') score += 10;
-            if (symptom.associatedSymptoms.length > 0) score += 5;
-        }
-        
-        // Bonus for database matches
-        if (analysis.conditions.length > 0) score += 15;
-        if (analysis.medications.length > 0) score += 10;
-        
-        // Cap at 100 and convert to confidence level
-        score = Math.min(score, 100);
-        
-        if (score >= 80) return 'high';
-        if (score >= 50) return 'medium';
-        return 'low';
-    }
-
     removeDuplicates(array, key) {
         const seen = new Set();
         return array.filter(item => {
@@ -517,70 +788,10 @@ class MedicalAPIService {
         });
     }
 
-    generateMedicationWarnings(medicationName, results) {
-        const warnings = [];
-        
-        // Check interactions
-        if (results.interactions && results.interactions.length > 0) {
-            warnings.push(`Has ${results.interactions.length} known drug interactions`);
-        }
-        
-        // Generic warnings
-        warnings.push('Always consult healthcare provider before starting new medications');
-        warnings.push('Check with pharmacist about drug interactions');
-        
-        return warnings;
-    }
-
-    generateMedicationRecommendations(medicationName, results) {
-        const recommendations = [];
-        
-        recommendations.push('Discuss with your doctor or pharmacist');
-        recommendations.push('Follow prescribed dosage instructions');
-        recommendations.push('Report any side effects to your healthcare provider');
-        
-        return recommendations;
-    }
-
-    // ===== API STATUS AND HEALTH =====
-
-    async getAPIStatus() {
-        console.log('🔍 Checking medical API status...');
-        
-        const status = {
-            timestamp: new Date().toISOString(),
-            overall: 'healthy',
-            services: {},
-            cache: this.cache.getStats()
-        };
-
-        // Check individual services
-        const [rxnormStatus, fhirStatus] = await Promise.all([
-            this.rxnorm.healthCheck(),
-            this.fhir.healthCheck()
-        ]);
-
-        status.services.rxnorm = rxnormStatus;
-        status.services.fhir = fhirStatus;
-
-        // Update overall status
-        if (rxnormStatus.status === 'error' && fhirStatus.status === 'error') {
-            status.overall = 'degraded';
-        }
-
-        this.serviceStatus = {
-            rxnorm: rxnormStatus.status,
-            fhir: fhirStatus.status,
-            lastHealthCheck: new Date().toISOString()
-        };
-
-        return status;
-    }
-
     // Clear cache
     clearCache() {
         this.cache.clear();
-        console.log('🧹 Medical API cache cleared');
+        console.log('🧹 Enhanced Medical API cache cleared');
     }
 
     // Get cache statistics
