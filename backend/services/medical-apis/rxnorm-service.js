@@ -1,7 +1,7 @@
 // backend/services/medical-apis/rxnorm-service.js
-// RxNorm Drug Database Integration Service
+// RxNorm Drug Database Integration Service - FIXED VERSION
 
-const fetch = require('node-fetch');
+const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
 const apiConfig = require('../../config/api-endpoints').rxnorm;
 const cacheConfig = require('../../config/cache-config');
 
