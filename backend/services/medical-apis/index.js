@@ -3,7 +3,8 @@
 
 const RxNormService = require('./rxnorm-service');
 const FHIRService = require('./fhir-service');
-const { ClinicalTrialsService, MedlinePlusService, OpenFDAService } = require('./enhanced-medical-services');
+const ClinicalTrialsService = require('.clinical-trials-service');
+const { MedlinePlusService, OpenFDAService } = require('./enhanced-medical-services');
 const CacheManager = require('../utils/cache-manager');
 const medicalMappings = require('../../config/medical-mappings');
 
