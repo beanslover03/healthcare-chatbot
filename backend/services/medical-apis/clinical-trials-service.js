@@ -1,205 +1,178 @@
 // backend/services/medical-apis/clinical-trials-service.js
-// ClinicalTrials.gov Integration for Treatment Options
+// CORRECTED VERSION - Uses proper ClinicalTrials.gov API v2
 
 const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
 const apiConfig = require('../../config/api-endpoints').clinicalTrials;
 const cacheConfig = require('../../config/cache-config');
 
-// Working ClinicalTrials.gov API v2 Implementation
-// Based on actual API testing results
-
-class ClinicalTrialsService{
-    constructor() {
-        this.baseUrl = 'https://clinicaltrials.gov/api/v2';
-        this.defaultPageSize = 20;
-        this.maxPageSize = 1000;
+class ClinicalTrialsService {
+    constructor(cacheManager) {
+        this.cache = cacheManager;
+        this.baseUrl = apiConfig.baseUrl; // https://clinicaltrials.gov/api/v2
+        this.endpoints = apiConfig.endpoints;
+        this.workingParams = apiConfig.workingParams;
+        this.timeout = apiConfig.timeout || 10000;
+        this.lastRequestTime = 0;
+        this.requestDelay = 4000; // 15 requests per minute
     }
 
-    /**
-     * Search for clinical trials with WORKING parameters only
-     * @param {Object} params - Search parameters
-     * @returns {Promise<Object>} - API response
-     */
-    async searchStudies(params = {}) {
-        const queryParams = this.buildWorkingQueryParams(params);
-        const url = `${this.baseUrl}/studies?${queryParams}`;
+    async searchTrialsByCondition(condition, options = {}) {
+        const cacheKey = `clinical_trials_${condition}`;
         
+        const cached = await this.cache.get(cacheKey);
+        if (cached && !options.skipCache) {
+            return cached;
+        }
+
         try {
-            console.log(`🔬 Searching Clinical Trials: ${url}`);
-            const response = await fetch(url);
+            await this.enforceRateLimit();
+            
+            // ✅ CORRECT: Use API v2 format with working parameters
+            const params = new URLSearchParams({
+                'query.cond': condition,
+                'pageSize': options.limit || 10,
+                'countTotal': true,
+                'format': 'json'
+            });
+
+            // ✅ CORRECT: Use the right endpoint
+            const url = `${this.baseUrl}${this.endpoints.studies}?${params}`;
+            console.log(`🔬 Clinical Trials API v2: ${url}`);
+            
+            const response = await this.makeRequest(url);
             
             if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+                console.warn(`Clinical Trials API returned ${response.status}, using fallback...`);
+                return this.getFallbackTrialInfo(condition);
             }
             
-            return await response.json();
+            const data = await response.json();
+            
+            // ✅ CORRECT: Handle API v2 response format
+            const trials = this.formatAPIv2Results(data, condition);
+            
+            await this.cache.set(cacheKey, trials, 2 * 60 * 60 * 1000); // 2 hours
+            
+            console.log(`✅ Clinical Trials: Found ${trials.length} trials for ${condition}`);
+            return trials;
+            
         } catch (error) {
-            console.error('Error fetching clinical trials:', error);
+            console.error('Clinical Trials search error:', error.message);
+            return this.getFallbackTrialInfo(condition);
+        }
+    }
+
+    // ✅ CORRECT: Format API v2 response (different structure than v1)
+    formatAPIv2Results(data, condition) {
+        const trials = [];
+        
+        try {
+            // API v2 has different structure than v1
+            if (data.studies) {
+                for (const study of data.studies.slice(0, 10)) {
+                    const protocolSection = study.protocolSection;
+                    
+                    if (protocolSection) {
+                        const identification = protocolSection.identificationModule || {};
+                        const status = protocolSection.statusModule || {};
+                        const design = protocolSection.designModule || {};
+                        
+                        trials.push({
+                            id: identification.nctId || 'NCT-unknown',
+                            title: identification.briefTitle || 'Clinical study available',
+                            officialTitle: identification.officialTitle,
+                            status: status.overallStatus || 'Status unknown',
+                            phase: design.phases?.[0] || 'Phase not specified',
+                            condition: condition,
+                            studyType: design.studyType || 'Interventional',
+                            enrollment: design.enrollmentInfo?.count || 'Open enrollment',
+                            startDate: status.startDateStruct?.date || 'Start date TBD',
+                            lastUpdate: status.lastUpdateSubmitDate || 'Recently updated',
+                            source: 'ClinicalTrials.gov'
+                        });
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Error formatting API v2 trial results:', error);
+        }
+        
+        return trials;
+    }
+
+    getFallbackTrialInfo(condition) {
+        return [{
+            id: 'fallback-trial',
+            title: `Clinical trials may be available for ${condition}`,
+            status: 'Visit ClinicalTrials.gov to search for current studies',
+            condition: condition,
+            phase: 'Various phases available',
+            studyType: 'Various study types',
+            enrollment: 'Check eligibility requirements',
+            source: 'Fallback'
+        }];
+    }
+
+    async makeRequest(url) {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), this.timeout);
+
+        try {
+            const response = await fetch(url, {
+                signal: controller.signal,
+                headers: { 
+                    'User-Agent': 'Healthcare-Chatbot/1.0',
+                    'Accept': 'application/json'
+                }
+            });
+            
+            clearTimeout(timeoutId);
+            return response;
+        } catch (error) {
+            clearTimeout(timeoutId);
+            if (error.name === 'AbortError') {
+                throw new Error('Clinical Trials API timeout');
+            }
             throw error;
         }
     }
 
-    /**
-     * Get a specific study by NCT ID
-     * @param {string} nctId - NCT identifier (e.g., "NCT04267848")
-     * @returns {Promise<Object>} - Study details
-     */
-    async getStudyById(nctId) {
-        const url = `${this.baseUrl}/studies/${nctId}`;
+    async enforceRateLimit() {
+        const now = Date.now();
+        const timeSinceLastRequest = now - this.lastRequestTime;
         
+        if (timeSinceLastRequest < this.requestDelay) {
+            const waitTime = this.requestDelay - timeSinceLastRequest;
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+        }
+        
+        this.lastRequestTime = Date.now();
+    }
+
+    async healthCheck() {
         try {
-            console.log(`🔬 Fetching study: ${nctId}`);
-            const response = await fetch(url);
+            const start = Date.now();
+            const testResult = await this.searchTrialsByCondition('headache', { limit: 1, skipCache: true });
+            const responseTime = Date.now() - start;
             
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
-            }
-            
-            return await response.json();
-        } catch (error) {
-            console.error(`Error fetching study ${nctId}:`, error);
-            throw error;
-        }
-    }
-
-    /**
-     * Build query parameters using ONLY working parameters
-     * Based on actual API testing - removes unsupported parameters
-     * @param {Object} params - Parameters object
-     * @returns {string} - URL encoded query string
-     */
-    buildWorkingQueryParams(params) {
-        const queryParams = new URLSearchParams();
-
-        // ✅ WORKING PARAMETERS (confirmed by testing)
-        if (params.condition) queryParams.append('query.cond', params.condition);
-        if (params.intervention) queryParams.append('query.intr', params.intervention);
-        if (params.title) queryParams.append('query.titles', params.title);
-        if (params.term) queryParams.append('query.term', params.term);
-        if (params.location) queryParams.append('query.locn', params.location);
-        
-        // Pagination and formatting (these work)
-        if (params.pageSize) queryParams.append('pageSize', Math.min(params.pageSize, this.maxPageSize));
-        if (params.pageToken) queryParams.append('pageToken', params.pageToken);
-        if (params.countTotal) queryParams.append('countTotal', params.countTotal);
-        if (params.format === 'csv') queryParams.append('format', 'csv');
-        
-        // Specific NCT IDs
-        if (params.nctIds && Array.isArray(params.nctIds)) {
-            queryParams.append('filter.ids', params.nctIds.join(','));
-        }
-
-        // ❌ REMOVED NON-WORKING PARAMETERS:
-        // - query.recrs (recruitment status) - returns "unknown parameter"
-        // - query.phase (study phase) - returns "unknown parameter" 
-        // - query.type (study type) - not tested but likely similar issue
-        // - query.spons (sponsor) - not tested but likely similar issue
-        // - Date filters - not tested in working combinations
-
-        return queryParams.toString();
-    }
-
-    /**
-     * Search with pagination to get all results
-     * @param {Object} params - Search parameters
-     * @returns {Promise<Array>} - All studies found
-     */
-    async searchAllStudies(params = {}) {
-        let allStudies = [];
-        let nextPageToken = null;
-        let pageCount = 0;
-        const maxPages = 10; // Reduced for safety
-
-        do {
-            const searchParams = {
-                ...params,
-                pageSize: this.maxPageSize,
-                ...(nextPageToken && { pageToken: nextPageToken })
+            return {
+                service: 'ClinicalTrials',
+                status: testResult.length > 0 && testResult[0].id !== 'fallback-trial' ? 'healthy' : 'degraded',
+                responseTime: responseTime,
+                endpoint: this.baseUrl,
+                note: testResult[0]?.id === 'fallback-trial' ? 'Using fallback data' : 'API responding',
+                lastChecked: new Date().toISOString()
             };
-
-            const response = await this.searchStudies(searchParams);
-            
-            if (response.studies) {
-                allStudies = allStudies.concat(response.studies);
-                console.log(`📄 Page ${++pageCount}: Found ${response.studies.length} studies (Total: ${allStudies.length})`);
-            }
-
-            nextPageToken = response.nextPageToken;
-
-        } while (nextPageToken && pageCount < maxPages);
-
-        console.log(`✅ Search complete: ${allStudies.length} total studies found`);
-        return allStudies;
-    }
-
-    /**
-     * Extract key information from study data
-     * @param {Object} study - Study object from API response
-     * @returns {Object} - Simplified study information
-     */
-    extractStudyInfo(study) {
-        const protocol = study.protocolSection || {};
-        const identification = protocol.identificationModule || {};
-        const status = protocol.statusModule || {};
-        const design = protocol.designModule || {};
-        const eligibility = protocol.eligibilityModule || {};
-        const contacts = protocol.contactsLocationsModule || {};
-
-        return {
-            nctId: identification.nctId,
-            title: identification.briefTitle,
-            officialTitle: identification.officialTitle,
-            status: status.overallStatus,
-            phase: design.phases?.[0] || 'N/A',
-            studyType: design.studyType,
-            conditions: protocol.conditionsModule?.conditions || [],
-            interventions: protocol.armsInterventionsModule?.interventions || [],
-            eligibility: {
-                criteria: eligibility.eligibilityCriteria,
-                gender: eligibility.sex,
-                minimumAge: eligibility.minimumAge,
-                maximumAge: eligibility.maximumAge
-            },
-            enrollment: design.enrollmentInfo?.count,
-            startDate: status.startDateStruct?.date,
-            completionDate: status.completionDateStruct?.date,
-            sponsor: protocol.sponsorCollaboratorsModule?.leadSponsor?.name,
-            locations: contacts.locations?.map(loc => ({
-                facility: loc.facility,
-                city: loc.city,
-                state: loc.state,
-                country: loc.country
-            })) || []
-        };
-    }
-
-    /**
-     * Helper method to filter studies by status after retrieval
-     * Since query.recrs doesn't work, we filter client-side
-     * @param {Array} studies - Array of study objects
-     * @param {string} status - Status to filter by (e.g., 'RECRUITING')
-     * @returns {Array} - Filtered studies
-     */
-    filterByStatus(studies, status) {
-        return studies.filter(study => {
-            const studyStatus = study.protocolSection?.statusModule?.overallStatus;
-            return studyStatus && studyStatus.toUpperCase() === status.toUpperCase();
-        });
-    }
-
-    /**
-     * Helper method to filter studies by phase after retrieval
-     * Since query.phase doesn't work, we filter client-side
-     * @param {Array} studies - Array of study objects
-     * @param {string} phase - Phase to filter by (e.g., 'PHASE2')
-     * @returns {Array} - Filtered studies
-     */
-    filterByPhase(studies, phase) {
-        return studies.filter(study => {
-            const phases = study.protocolSection?.designModule?.phases || [];
-            return phases.some(p => p.toUpperCase() === phase.toUpperCase());
-        });
+        } catch (error) {
+            return {
+                service: 'ClinicalTrials',
+                status: 'error',
+                error: error.message,
+                endpoint: this.baseUrl,
+                lastChecked: new Date().toISOString()
+            };
+        }
     }
 }
+
+module.exports = ClinicalTrialsService;
