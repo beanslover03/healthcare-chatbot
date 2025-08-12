@@ -1,4 +1,5 @@
-// backend/services/claude-service.js - ENHANCED VERSION (REPLACE YOUR EXISTING FILE)
+// backend/services/claude-service.js - ENHANCED VERSION WITH ODPHP INTEGRATION
+
 const Anthropic = require('@anthropic-ai/sdk');
 
 class ClaudeService {
@@ -7,52 +8,51 @@ class ClaudeService {
             apiKey: process.env.ANTHROPIC_API_KEY
         });
         
-        // Keep your existing medical mappings
         this.medicalMappings = require('../config/medical-mappings');
 
-        // Enhanced system prompts with context awareness
+        // Enhanced system prompts with ODPHP awareness
         this.systemPrompts = {
-            conversational: `You are a caring medical assistant. Have natural conversations about health concerns.
+            conversational: `You are a caring medical assistant with access to comprehensive health guidance.
         
         STYLE:
         - Be warm and empathetic
         - Ask 1-2 follow-up questions to understand better
         - Keep responses to 2-3 sentences unless it's an emergency
-        - Focus on understanding their specific situation first
+        - When you have personalized health recommendations, mention them naturally
         
-        REMEMBER: You're here to listen and guide, not lecture.`,
+        REMEMBER: You have access to evidence-based health guidance from MyHealthfinder.`,
         
-            medication_counselor: `You are helping with medication questions. Be focused and ask what they specifically want to know.
+            medication_counselor: `You are helping with medication questions with access to safety data and health guidance.
         
         STYLE:
         - Ask about their specific medication concerns
         - Keep safety-focused but conversational
-        - 1-2 sentences max unless they ask for details`,
+        - Integrate preventive health recommendations when relevant`,
         
             emergency_triage: `You are assessing potentially urgent situations.
         
         STYLE:
         - Be direct and calm
         - Give immediate guidance if truly urgent
-        - Ask key questions to assess severity
-        - Keep instructions clear and brief`,
+        - Ask key questions to assess severity`,
         
-            health_educator: `You are helping someone understand a health topic.
+            health_educator: `You are helping someone understand health topics with comprehensive educational resources.
         
         STYLE:
         - Ask what specifically they want to know
         - Give clear, simple explanations
-        - Check if they want more detail`,
+        - Use available health guidance to provide complete answers
+        - Mention preventive care recommendations when appropriate`,
         
             research_advisor: `You are helping with treatment and research questions.
         
         STYLE:
         - Ask about their specific interests in research/treatments
         - Be encouraging but realistic
-        - Keep responses focused`
+        - Integrate clinical trials and health guidance information`
         };
 
-        // Enhanced context detection
+        // Enhanced context detection including health topics
         this.contextTriggers = {
             medication_counselor: [
                 'medication', 'drug', 'prescription', 'side effects', 'dosage',
@@ -68,17 +68,180 @@ class ClaudeService {
             ],
             health_educator: [
                 'what is', 'how does', 'explain', 'learn about', 'understand',
-                'information about', 'tell me about', 'causes of'
+                'information about', 'tell me about', 'causes of', 'prevention',
+                'healthy lifestyle', 'wellness', 'nutrition', 'exercise'
             ]
         };
 
-        // User profiling system
         this.userProfiles = new Map();
         
-        console.log('🧠 Enhanced Claude Service initialized with medical intelligence');
+        console.log('🧠 Enhanced Claude Service initialized with ODPHP integration');
     }
 
-    // Enhanced context detection
+    // Enhanced symptom assessment with ODPHP integration
+    async assessSymptoms(userMessage, medicalAnalysis, conversationHistory = [], sessionId = 'default') {
+        try {
+            console.log('🧠 Starting enhanced symptom assessment with ODPHP data...');
+
+            // 1. Detect optimal context
+            const context = this.detectMedicalContext(userMessage, medicalAnalysis);
+            console.log(`📋 Using context: ${context}`);
+
+            // 2. Build user profile
+            const userProfile = this.buildUserProfile(sessionId, conversationHistory, medicalAnalysis);
+
+            // 3. Generate enhanced prompt with ODPHP data
+            const enhancedPrompt = this.buildEnhancedPromptWithODPHP(userMessage, medicalAnalysis, context, userProfile);
+
+            // 4. Get response using appropriate system prompt
+            const systemPrompt = this.systemPrompts[context] || this.systemPrompts.conversational;
+            
+            const response = await this.anthropic.messages.create({
+                model: "claude-3-5-sonnet-20241022",
+                max_tokens: 700, // Increased for richer responses
+                temperature: 0.7,
+                system: systemPrompt,
+                messages: [
+                    ...conversationHistory.slice(-4),
+                    { role: "user", content: enhancedPrompt }
+                ]
+            });
+
+            // 5. Enhance response with ODPHP data
+            let enhancedResponse = response.content[0].text;
+            enhancedResponse = this.enhanceWithODPHPData(enhancedResponse, medicalAnalysis, context);
+
+            // 6. Format based on context and user profile
+            enhancedResponse = this.formatForUser(enhancedResponse, context, userProfile);
+
+            console.log(`✅ Enhanced response generated with ODPHP data (${context}, ${userProfile.communicationStyle} style)`);
+
+            return {
+                success: true,
+                response: enhancedResponse,
+                metadata: {
+                    context: context,
+                    userProfile: userProfile,
+                    apiSources: medicalAnalysis?.apiSources || [],
+                    confidence: medicalAnalysis?.confidence || 'medium',
+                    odphpDataUsed: this.hasODPHPData(medicalAnalysis)
+                }
+            };
+
+        } catch (error) {
+            console.error('❌ Enhanced assessment error:', error);
+            
+            const fallbackResponse = await this.generateBasicResponse(userMessage, medicalAnalysis);
+            return {
+                success: true,
+                response: fallbackResponse,
+                metadata: { fallback: true }
+            };
+        }
+    }
+
+    // NEW: Enhanced prompt building with ODPHP data
+    buildEnhancedPromptWithODPHP(userMessage, medicalAnalysis, context, userProfile) {
+        let prompt = `User said: "${userMessage}"\n\n`;
+    
+        // Add medical context briefly
+        if (medicalAnalysis?.symptoms?.length > 0) {
+            const mainSymptom = medicalAnalysis.symptoms[0];
+            prompt += `Main symptom identified: ${mainSymptom.name}\n`;
+        }
+
+        // NEW: Add ODPHP health guidance context
+        if (medicalAnalysis?.healthGuidance?.length > 0) {
+            const guidance = medicalAnalysis.healthGuidance[0];
+            prompt += `Health guidance available: ${guidance.title}\n`;
+        }
+
+        // NEW: Add ODPHP personalized recommendations context
+        if (medicalAnalysis?.preventiveRecommendations?.length > 0) {
+            const rec = medicalAnalysis.preventiveRecommendations[0];
+            prompt += `Personalized health recommendation: ${rec.title}\n`;
+        }
+
+        // NEW: Add ODPHP educational resources context
+        if (medicalAnalysis?.educationalResources?.length > 0) {
+            const edu = medicalAnalysis.educationalResources[0];
+            prompt += `Educational resource: ${edu.information?.title || 'Health education available'}\n`;
+        }
+    
+        // Add simple context instruction
+        switch (context) {
+            case 'emergency_triage':
+                prompt += `This seems urgent. Respond with immediate guidance but keep it brief and clear.\n`;
+                break;
+            case 'medication_counselor':
+                prompt += `Focus on medication questions. Ask what they want to know specifically.\n`;
+                break;
+            case 'health_educator':
+                prompt += `This is about health education. Use available health guidance to provide comprehensive information.\n`;
+                break;
+            default:
+                prompt += `Respond conversationally. Ask 1-2 follow-up questions to understand better.\n`;
+        }
+    
+        // Add user style
+        if (userProfile.communicationStyle === 'concise') {
+            prompt += `Keep response short and direct.\n`;
+        }
+    
+        prompt += `\nBe conversational, empathetic, and naturally integrate available health guidance and recommendations.`;
+    
+        return prompt;
+    }
+
+    // NEW: Enhanced response enhancement with ODPHP data
+    enhanceWithODPHPData(response, medicalAnalysis, context) {
+        let enhanced = response;
+    
+        // Add ODPHP health guidance if relevant
+        if (medicalAnalysis?.healthGuidance?.length > 0 && context === 'health_educator') {
+            const guidance = medicalAnalysis.healthGuidance[0];
+            if (guidance.summary) {
+                enhanced += ` According to MyHealthfinder, ${guidance.summary.substring(0, 150)}...`;
+            }
+        }
+
+        // Add personalized recommendations naturally
+        if (medicalAnalysis?.preventiveRecommendations?.length > 0) {
+            const rec = medicalAnalysis.preventiveRecommendations[0];
+            if (rec.title && !enhanced.toLowerCase().includes('recommend')) {
+                enhanced += ` Based on health guidelines, you might also consider looking into ${rec.title.toLowerCase()}.`;
+            }
+        }
+
+        // Add educational resources for complex topics
+        if (medicalAnalysis?.educationalResources?.length > 0 && context === 'health_educator') {
+            const eduResource = medicalAnalysis.educationalResources[0];
+            if (eduResource.information?.title) {
+                enhanced += ` For more detailed information about ${eduResource.symptom}, MyHealthfinder provides guidance on ${eduResource.information.title.toLowerCase()}.`;
+            }
+        }
+
+        // Show comprehensive data sources if multiple APIs used
+        if (medicalAnalysis?.apiSources?.length >= 4) {
+            enhanced += ` (This assessment uses ${medicalAnalysis.apiSources.length} medical databases including MyHealthfinder)`;
+        }
+    
+        return enhanced;
+    }
+
+    // NEW: Check if ODPHP data is available
+    hasODPHPData(medicalAnalysis) {
+        if (!medicalAnalysis) return false;
+        
+        return (
+            (medicalAnalysis.healthGuidance && medicalAnalysis.healthGuidance.length > 0) ||
+            (medicalAnalysis.preventiveRecommendations && medicalAnalysis.preventiveRecommendations.length > 0) ||
+            (medicalAnalysis.educationalResources && medicalAnalysis.educationalResources.length > 0) ||
+            (medicalAnalysis.apiSources && medicalAnalysis.apiSources.some(source => source.includes('ODPHP')))
+        );
+    }
+
+    // Enhanced context detection considering ODPHP data
     detectMedicalContext(userMessage, medicalAnalysis) {
         const messageLower = userMessage.toLowerCase();
         
@@ -94,13 +257,20 @@ class ClaudeService {
             }
         }
 
-        // Context based on API data availability
+        // Context based on API data availability (including ODPHP)
         if (medicalAnalysis?.medications?.length > 0 || medicalAnalysis?.apiSources?.includes('RxNorm')) {
             return 'medication_counselor';
         }
 
         if (medicalAnalysis?.clinicalTrials?.length > 0) {
             return 'research_advisor';
+        }
+
+        // NEW: Health educator context for ODPHP data
+        if (medicalAnalysis?.healthGuidance?.length > 0 || 
+            medicalAnalysis?.preventiveRecommendations?.length > 0 ||
+            medicalAnalysis?.educationalResources?.length > 0) {
+            return 'health_educator';
         }
 
         if (messageLower.includes('what') || messageLower.includes('explain')) {
@@ -110,18 +280,28 @@ class ClaudeService {
         return 'conversational';
     }
 
-    // Enhanced user profiling
+    // Enhanced user profiling with health interests
     buildUserProfile(sessionId, conversationHistory, medicalAnalysis) {
         let profile = this.userProfiles.get(sessionId) || {
             interactionCount: 0,
             knowledgeLevel: 'medium',
             communicationStyle: 'balanced',
             preferredDetail: 'moderate',
+            healthInterests: [], // NEW: Track health topics of interest
             lastSeen: null
         };
 
         profile.interactionCount++;
         profile.lastSeen = Date.now();
+
+        // Track health interests based on ODPHP data
+        if (medicalAnalysis?.healthGuidance) {
+            for (const guidance of medicalAnalysis.healthGuidance) {
+                if (guidance.categories) {
+                    profile.healthInterests.push(...guidance.categories);
+                }
+            }
+        }
 
         // Analyze communication style from conversation
         if (conversationHistory.length > 0) {
@@ -130,10 +310,14 @@ class ClaudeService {
             profile.knowledgeLevel = this.assessKnowledgeLevel(userMessages);
         }
 
+        // Clean up health interests (keep unique, limit to 10)
+        profile.healthInterests = [...new Set(profile.healthInterests)].slice(0, 10);
+
         this.userProfiles.set(sessionId, profile);
         return profile;
     }
 
+    // Keep all existing methods (they remain unchanged)
     analyzeCommunicationStyle(userMessages) {
         if (userMessages.length === 0) return 'balanced';
 
@@ -193,118 +377,6 @@ class ClaudeService {
         return 'basic';
     }
 
-    // Enhanced symptom assessment with context awareness
-    async assessSymptoms(userMessage, medicalAnalysis, conversationHistory = [], sessionId = 'default') {
-        try {
-            console.log('🧠 Starting enhanced symptom assessment...');
-
-            // 1. Detect optimal context
-            const context = this.detectMedicalContext(userMessage, medicalAnalysis);
-            console.log(`📋 Using context: ${context}`);
-
-            // 2. Build user profile
-            const userProfile = this.buildUserProfile(sessionId, conversationHistory, medicalAnalysis);
-
-            // 3. Generate enhanced prompt
-            const enhancedPrompt = this.buildEnhancedPrompt(userMessage, medicalAnalysis, context, userProfile);
-
-            // 4. Get response using appropriate system prompt
-            const systemPrompt = this.systemPrompts[context] || this.systemPrompts.conversational;
-            
-            const response = await this.anthropic.messages.create({
-                model: "claude-3-5-sonnet-20241022",
-                max_tokens: 600,
-                temperature: 0.7,
-                system: systemPrompt,
-                messages: [
-                    ...conversationHistory.slice(-4),
-                    { role: "user", content: enhancedPrompt }
-                ]
-            });
-
-            // 5. Enhance response with API data
-            let enhancedResponse = response.content[0].text;
-            enhancedResponse = this.enhanceWithAPIData(enhancedResponse, medicalAnalysis, context);
-
-            // 6. Format based on context and user profile
-            enhancedResponse = this.formatForUser(enhancedResponse, context, userProfile);
-
-            console.log(`✅ Enhanced response generated (${context}, ${userProfile.communicationStyle} style)`);
-
-            return {
-                success: true,
-                response: enhancedResponse,
-                metadata: {
-                    context: context,
-                    userProfile: userProfile,
-                    apiSources: medicalAnalysis?.apiSources || [],
-                    confidence: medicalAnalysis?.confidence || 'medium'
-                }
-            };
-
-        } catch (error) {
-            console.error('❌ Enhanced assessment error:', error);
-            
-            // Fallback to basic response
-            const fallbackResponse = await this.generateBasicResponse(userMessage, medicalAnalysis);
-            return {
-                success: true,
-                response: fallbackResponse,
-                metadata: { fallback: true }
-            };
-        }
-    }
-
-    buildEnhancedPrompt(userMessage, medicalAnalysis, context, userProfile) {
-        let prompt = `User said: "${userMessage}"\n\n`;
-    
-        // Add medical context briefly
-        if (medicalAnalysis?.symptoms?.length > 0) {
-            const mainSymptom = medicalAnalysis.symptoms[0];
-            prompt += `Main symptom identified: ${mainSymptom.name}\n`;
-        }
-    
-        // Add simple context instruction
-        switch (context) {
-            case 'emergency_triage':
-                prompt += `This seems urgent. Respond with immediate guidance but keep it brief and clear.\n`;
-                break;
-            case 'medication_counselor':
-                prompt += `Focus on medication questions. Ask what they want to know specifically.\n`;
-                break;
-            default:
-                prompt += `Respond conversationally. Ask 1-2 follow-up questions to understand better.\n`;
-        }
-    
-        // Add user style
-        if (userProfile.communicationStyle === 'concise') {
-            prompt += `Keep response short and direct.\n`;
-        }
-    
-        prompt += `\nBe conversational, empathetic, and ask questions to understand their situation better.`;
-    
-        return prompt;
-    }
-
-    enhanceWithAPIData(response, medicalAnalysis, context) {
-        let enhanced = response;
-    
-        // Only add brief API insights, not long explanations
-        if (medicalAnalysis?.medications?.length > 0 && context === 'medication_counselor') {
-            const otcMed = medicalAnalysis.medications.find(m => m.type === 'otc');
-            if (otcMed) {
-                enhanced += ` ${otcMed.name} is one option that's available over-the-counter.`;
-            }
-        }
-    
-        // Only show confidence if it's high or if there are many sources
-        if (medicalAnalysis?.apiSources?.length >= 3) {
-            enhanced += ` (This assessment uses ${medicalAnalysis.apiSources.length} medical databases)`;
-        }
-    
-        return enhanced;
-    }
-
     formatForUser(response, context, userProfile) {
         let formatted = response;
     
@@ -320,17 +392,10 @@ class ClaudeService {
             });
         }
     
-        // Remove the summary addition and other extra formatting
         return formatted;
     }
 
-    extractKeySentences(text) {
-        const sentences = text.split('.').filter(s => s.trim().length > 10);
-        return sentences.slice(0, 2).join('. ') + '.';
-    }
-
     async generateBasicResponse(userMessage, medicalAnalysis) {
-        // Your existing basic response logic
         const response = await this.anthropic.messages.create({
             model: "claude-3-5-sonnet-20241022",
             max_tokens: 400,
@@ -342,7 +407,7 @@ class ClaudeService {
         return response.content[0].text;
     }
 
-    // Keep all your existing methods unchanged
+    // All existing methods remain the same
     isConversationEnding(userMessage) {
         const endingSignals = [
             'thanks', 'thank you', 'that helps', 'that\'s all', 'i\'m good',
@@ -356,7 +421,6 @@ class ClaudeService {
     isEmergency(userMessage) {
         const messageLower = userMessage.toLowerCase();
         
-        // Use existing emergency patterns
         const emergencyPatterns = this.medicalMappings.emergencyPatterns;
         
         for (const [conditionId, pattern] of Object.entries(emergencyPatterns)) {
@@ -383,7 +447,7 @@ class ClaudeService {
 
     async generateEndingResponse(conversationHistory = []) {
         return this.getChatResponse(
-            "User is ending the conversation. Give a warm, caring goodbye.",
+            "User is ending the conversation. Give a warm, caring goodbye with a gentle reminder about health resources.",
             conversationHistory,
             'ending_conversation'
         );
@@ -428,7 +492,7 @@ class ClaudeService {
                 model: "claude-3-5-sonnet-20241022",
                 max_tokens: 50,
                 messages: [
-                    { role: "user", content: "Say 'Enhanced Claude ready' if you can help with medical conversations." }
+                    { role: "user", content: "Say 'Enhanced Claude with ODPHP ready' if you can help with medical conversations." }
                 ]
             });
 
@@ -437,6 +501,7 @@ class ClaudeService {
                 response: response.content[0].text,
                 model: 'claude-3-5-sonnet-20241022',
                 enhanced: true,
+                odphpIntegration: true,
                 contexts: Object.keys(this.systemPrompts).length,
                 userProfiles: this.userProfiles.size
             };
@@ -453,7 +518,7 @@ class ClaudeService {
         console.log(`Cleared enhanced context for user ${userId}`);
     }
 
-    // Get enhanced analytics
+    // Get enhanced analytics with ODPHP insights
     getEnhancedAnalytics(sessionId) {
         const profile = this.userProfiles.get(sessionId);
         
@@ -466,7 +531,10 @@ class ClaudeService {
                 'User profiling',
                 'API-driven intelligence', 
                 'Adaptive communication',
-                'Multi-modal formatting'
+                'Multi-modal formatting',
+                'ODPHP MyHealthfinder integration', // NEW
+                'Personalized health recommendations', // NEW
+                'Evidence-based health guidance' // NEW
             ]
         };
     }

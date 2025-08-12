@@ -1,5 +1,5 @@
 // backend/config/api-endpoints.js
-// Centralized configuration for all medical API endpoints
+// UPDATED: Centralized configuration for all medical API endpoints including ODPHP
 
 module.exports = {
     // RxNorm - Comprehensive Drug Database (NIH)
@@ -47,7 +47,6 @@ module.exports = {
             studies: '/studies',
             studyById: '/studies/{nctId}'
         },
-        // Only include working parameters
         workingParams: ['query.cond', 'query.intr', 'query.titles', 'query.term', 'query.locn'],
         rateLimit: {
             requests: 15,
@@ -63,7 +62,6 @@ module.exports = {
             search: '/search/current',
             content: '/content/current'
         },
-        // Note: Requires API key for full access
         requiresAuth: true,
         rateLimit: {
             requests: 5,
@@ -83,6 +81,30 @@ module.exports = {
             perMinute: 1
         },
         timeout: 5000
+    },
+
+    // NEW: ODPHP MyHealthfinder API Configuration
+    odphp: {
+        baseUrl: 'https://odphp.health.gov/myhealthfinder/api/v4',
+        endpoints: {
+            topics: '/itemlist.json',
+            topicDetails: '/topicsearch.json',
+            personalizedRecommendations: '/myhealthfinder.json'
+        },
+        parameters: {
+            // Available parameters for personalized recommendations
+            demographics: ['age', 'sex'],
+            lifestyle: ['pregnant', 'sexuallyActive', 'tobaccoUse'],
+            language: ['Lang'], // 'es' for Spanish
+            filters: ['Type', 'TopicId']
+        },
+        rateLimit: {
+            requests: 20, // No official rate limit, being conservative
+            perMinute: 1
+        },
+        timeout: 8000,
+        requiresAuth: false,
+        description: 'ODPHP MyHealthfinder provides evidence-based health recommendations and preventive care guidance'
     },
 
     // Drug Interaction APIs
