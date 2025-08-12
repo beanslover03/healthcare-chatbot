@@ -1,10 +1,11 @@
 // backend/services/medical-apis/index.js
-// Enhanced Main Medical API Service - Now with Clinical Trials, MedlinePlus, and OpenFDA
+// Main Medical API Service - Clean structure with separate service files
 
 const RxNormService = require('./rxnorm-service');
 const FHIRService = require('./fhir-service');
 const ClinicalTrialsService = require('./clinical-trials-service');
-const { MedlinePlusService, OpenFDAService } = require('./enhanced-medical-services');
+const { MedlinePlusService } = require('./enhanced-medical-services');
+const OpenFDAService = require('./openfda-service');
 const CacheManager = require('../utils/cache-manager');
 const medicalMappings = require('../../config/medical-mappings');
 
@@ -13,7 +14,7 @@ class MedicalAPIService {
         // Initialize cache manager
         this.cache = new CacheManager();
         
-        // Initialize all medical services
+        // Initialize all medical services with clean imports
         this.rxnorm = new RxNormService(this.cache);
         this.fhir = new FHIRService(this.cache);
         this.clinicalTrials = new ClinicalTrialsService(this.cache);
@@ -30,13 +31,18 @@ class MedicalAPIService {
             lastHealthCheck: null
         };
         
-        console.log('🏥 Enhanced Medical API Service initialized with 5 databases');
+        console.log('🏥 Medical API Service initialized with clean architecture:');
+        console.log('   ✅ RxNorm Service (rxnorm-service.js)');
+        console.log('   ✅ FHIR Service (fhir-service.js)');
+        console.log('   ✅ Clinical Trials Service (clinical-trials-service.js)');
+        console.log('   ✅ MedlinePlus Service (enhanced-medical-services.js)');
+        console.log('   ✅ OpenFDA Service (openfda-service.js)');
     }
 
-    // ===== ENHANCED SYMPTOM ANALYSIS =====
+    // ===== MAIN SYMPTOM ANALYSIS METHOD =====
 
     async analyzeSymptoms(symptoms, userMessage) {
-        console.log('🔍 Starting comprehensive symptom analysis with enhanced databases...');
+        console.log('🔍 Starting comprehensive symptom analysis...');
         
         const analysis = {
             userMessage,
@@ -54,9 +60,9 @@ class MedicalAPIService {
         };
 
         try {
-            // 1. Enrich identified symptoms with ALL medical databases
+            // Enrich identified symptoms with ALL medical databases
             for (const symptom of analysis.symptoms) {
-                console.log(`📋 Comprehensively enriching symptom: ${symptom.name}`);
+                console.log(`📋 Enriching symptom: ${symptom.name}`);
                 
                 // Parallel database queries for speed
                 const [fhirConditions, healthInfo, trials] = await Promise.all([
@@ -81,20 +87,20 @@ class MedicalAPIService {
                     analysis.apiSources.push('ClinicalTrials.gov');
                 }
                 
-                // Get enhanced medication recommendations
+                // Get medication recommendations
                 const medications = await this.getEnhancedMedicationRecommendations(symptom);
                 if (medications.length > 0) {
                     analysis.medications.push(...medications);
                 }
             }
 
-            // 2. Emergency assessment (unchanged)
+            // Emergency assessment
             analysis.emergencyFactors = this.assessEmergencyFactors(analysis.symptoms, userMessage);
             
-            // 3. Enhanced recommendations with new data sources
+            // Enhanced recommendations
             analysis.recommendations = await this.generateEnhancedRecommendations(analysis);
             
-            // 4. Calculate enhanced confidence
+            // Calculate confidence
             analysis.confidence = this.calculateEnhancedConfidence(analysis);
             
             // Remove duplicates and limit results
@@ -104,28 +110,18 @@ class MedicalAPIService {
             analysis.clinicalTrials = this.removeDuplicates(analysis.clinicalTrials, 'id').slice(0, 3);
             analysis.apiSources = [...new Set(analysis.apiSources)];
             
-            console.log(`✅ Enhanced analysis complete. Sources: ${analysis.apiSources.join(', ')}`);
+            console.log(`✅ Analysis complete. Sources: ${analysis.apiSources.join(', ')}`);
             
         } catch (error) {
-            console.error('❌ Error in enhanced symptom analysis:', error);
+            console.error('❌ Error in symptom analysis:', error);
             analysis.error = error.message;
             analysis.confidence = 'low';
         }
 
-        console.log('🔍 API USAGE SUMMARY:');
-        console.log(`   📊 Total APIs called: ${analysis.apiSources.length}`);
-        console.log(`   🎯 APIs used: ${analysis.apiSources.join(', ')}`);
-        console.log(`   💊 Medications found: ${analysis.medications?.length || 0}`);
-        console.log(`   🏥 Conditions found: ${analysis.conditions?.length || 0}`);
-        console.log(`   🔬 Clinical trials: ${analysis.clinicalTrials?.length || 0}`);
-        console.log(`   📚 Health info: ${analysis.healthInformation?.length || 0}`);
-        console.log(`   ⚠️  Safety data: ${analysis.drugSafety?.length || 0}`);
-        console.log(`   🎲 Confidence: ${analysis.confidence}`);
-
         return analysis;
     }
 
-    // ===== ENHANCED MEDICATION LOOKUP =====
+    // ===== COMPREHENSIVE MEDICATION LOOKUP =====
 
     async comprehensiveMedicationLookup(medicationName) {
         console.log(`💊 Starting comprehensive medication lookup for: ${medicationName}`);
@@ -148,7 +144,7 @@ class MedicalAPIService {
         };
 
         try {
-            // Search all databases in parallel for speed
+            // Search all databases in parallel
             const [rxnormData, fhirData, fdaLabels, fdaEvents] = await Promise.all([
                 this.rxnorm.comprehensiveDrugLookup(medicationName),
                 this.fhir.searchMedications(medicationName),
@@ -209,7 +205,7 @@ class MedicalAPIService {
         const recommendations = [];
         
         try {
-            // Get OTC recommendations (existing)
+            // Get OTC recommendations
             const otcMeds = this.getOTCRecommendations(symptom.id);
             recommendations.push(...otcMeds);
             
@@ -261,7 +257,7 @@ class MedicalAPIService {
             clinicalOptions: []
         };
 
-        // Emergency recommendations (unchanged)
+        // Emergency recommendations
         if (analysis.emergencyFactors.length > 0) {
             recommendations.immediateActions.push('Seek immediate medical attention');
             recommendations.immediateActions.push('Call 911 if symptoms are severe');
@@ -306,7 +302,7 @@ class MedicalAPIService {
             }
         }
 
-        // Medication recommendations (already enhanced)
+        // Medication recommendations
         recommendations.medications = analysis.medications.slice(0, 5);
 
         // Remove duplicates
@@ -316,7 +312,7 @@ class MedicalAPIService {
         return recommendations;
     }
 
-    // ===== ENHANCED SAFETY INFORMATION =====
+    // ===== SAFETY INFORMATION =====
 
     compileSafetyInformation(medicationResults) {
         const safetyInfo = [];
@@ -377,10 +373,10 @@ class MedicalAPIService {
         // Enhanced bonus for multiple database matches
         if (analysis.conditions.length > 0) score += 15;
         if (analysis.medications.length > 0) score += 10;
-        if (analysis.healthInformation.length > 0) score += 15; // NEW: MedlinePlus data
-        if (analysis.clinicalTrials.length > 0) score += 10; // NEW: Clinical trials
-        if (analysis.apiSources.includes('OpenFDA-Labels')) score += 12; // NEW: FDA data
-        if (analysis.apiSources.includes('OpenFDA-Events')) score += 8; // NEW: Safety data
+        if (analysis.healthInformation.length > 0) score += 15;
+        if (analysis.clinicalTrials.length > 0) score += 10;
+        if (analysis.apiSources.includes('OpenFDA-Labels')) score += 12;
+        if (analysis.apiSources.includes('OpenFDA-Events')) score += 8;
         
         // Bonus for multiple API sources (cross-validation)
         const uniqueSources = [...new Set(analysis.apiSources)];
@@ -397,7 +393,7 @@ class MedicalAPIService {
         return 'low';
     }
 
-    // ===== ENHANCED WARNING GENERATION =====
+    // ===== WARNING GENERATION =====
 
     generateEnhancedMedicationWarnings(medicationName, results) {
         const warnings = [];
@@ -485,10 +481,10 @@ class MedicalAPIService {
         return guidance;
     }
 
-    // ===== ENHANCED API STATUS =====
+    // ===== API STATUS =====
 
     async getAPIStatus() {
-        console.log('🔍 Checking enhanced medical API status...');
+        console.log('🔍 Checking medical API status...');
         
         const status = {
             timestamp: new Date().toISOString(),
@@ -557,10 +553,9 @@ class MedicalAPIService {
         return Math.round((healthyCount / serviceStatuses.length) * 100);
     }
 
-    // ===== UTILITY METHODS (Inherited from original) =====
+    // ===== UTILITY METHODS =====
 
     async identifyAndEnrichSymptoms(message) {
-        // Keep existing implementation
         const identifiedSymptoms = [];
         const messageLower = message.toLowerCase();
 
@@ -802,49 +797,12 @@ class MedicalAPIService {
     // Clear cache
     clearCache() {
         this.cache.clear();
-        console.log('🧹 Enhanced Medical API cache cleared');
+        console.log('🧹 Medical API cache cleared');
     }
 
     // Get cache statistics
     getCacheStats() {
         return this.cache.getStats();
-    }
-
-    // Add to end of existing MedicalAPIService class in index.js
-
-    // Initialize enhanced systems connection
-    initializeEnhancedSystems(claudeService) {
-        if (claudeService && claudeService.setMedicalAPIService) {
-            claudeService.setMedicalAPIService(this);
-            console.log('🔗 Enhanced systems connected to medical APIs');
-        }
-    }
-
-    // Enhanced symptom analysis with adaptive querying
-    async enhancedAnalyzeSymptoms(symptoms, userMessage, sessionId = 'default') {
-        console.log('🧠 Starting enhanced symptom analysis...');
-        
-        // Use existing analysis as base
-        const baseAnalysis = await this.analyzeSymptoms(symptoms, userMessage);
-        
-        // Enhance with adaptive intelligence if available
-        if (this.adaptiveQuery) {
-            try {
-                const adaptiveResults = await this.adaptiveQuery.intelligentSymptomAnalysis(
-                    userMessage, 
-                    [] // conversation history would come from session
-                );
-                
-                // Merge results
-                baseAnalysis.adaptiveInsights = adaptiveResults.synthesized;
-                baseAnalysis.queryStrategy = adaptiveResults.metadata.queryStrategy;
-                
-            } catch (error) {
-                console.warn('⚠️ Adaptive query enhancement failed:', error.message);
-            }
-        }
-        
-        return baseAnalysis;
     }
 }
 

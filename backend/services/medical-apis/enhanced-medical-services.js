@@ -1,11 +1,8 @@
 // backend/services/medical-apis/enhanced-medical-services.js
-// FIXED VERSION - Handles actual API responses correctly
+// CLEANED VERSION - Only MedlinePlus Service
 
 const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
-const apiConfig = require('../../config/api-endpoints');
-const cacheConfig = require('../../config/cache-config');
 
-// Updated MedLinePlus to accept data in XML format
 class MedlinePlusService {
     constructor(cacheManager) {
         this.cache = cacheManager;
@@ -82,19 +79,15 @@ class MedlinePlusService {
         }
     }
 
-    // NEW: XML Response Parser
     parseXMLResponse(xmlText, topic) {
         const healthInfo = [];
         
         try {
-            // Simple XML parsing without external dependencies
-            // Look for common XML patterns in MedlinePlus responses
-            
-            // Method 1: Extract document entries
+            // Extract document entries
             const documentMatches = xmlText.match(/<document[^>]*>(.*?)<\/document>/gs);
             
             if (documentMatches) {
-                for (const docMatch of documentMatches.slice(0, 3)) { // Limit to 3 results
+                for (const docMatch of documentMatches.slice(0, 3)) {
                     const info = this.extractDocumentInfo(docMatch, topic);
                     if (info) {
                         healthInfo.push(info);
@@ -102,7 +95,7 @@ class MedlinePlusService {
                 }
             }
             
-            // Method 2: Look for simpler content patterns if documents not found
+            // Fallback extraction methods
             if (healthInfo.length === 0) {
                 const simpleInfo = this.extractSimpleXMLInfo(xmlText, topic);
                 if (simpleInfo) {
@@ -110,7 +103,6 @@ class MedlinePlusService {
                 }
             }
             
-            // Method 3: Extract any text content if structured parsing fails
             if (healthInfo.length === 0) {
                 const textInfo = this.extractTextContent(xmlText, topic);
                 if (textInfo) {
@@ -125,14 +117,11 @@ class MedlinePlusService {
         return healthInfo;
     }
 
-    // Extract structured document information from XML
     extractDocumentInfo(docXML, topic) {
         try {
-            // Extract title
             const titleMatch = docXML.match(/<title[^>]*>(.*?)<\/title>/s);
             const title = titleMatch ? this.cleanXMLText(titleMatch[1]) : `${topic} Information`;
             
-            // Extract content/summary
             const contentMatch = docXML.match(/<content[^>]*>(.*?)<\/content>/s) || 
                                 docXML.match(/<summary[^>]*>(.*?)<\/summary>/s) ||
                                 docXML.match(/<abstract[^>]*>(.*?)<\/abstract>/s);
@@ -140,12 +129,10 @@ class MedlinePlusService {
             const summary = contentMatch ? this.cleanXMLText(contentMatch[1]) : 
                           `Health information about ${topic} from MedlinePlus`;
             
-            // Extract URL if available
             const urlMatch = docXML.match(/<url[^>]*>(.*?)<\/url>/s) ||
                            docXML.match(/href=["'](https?:\/\/[^"']+)["']/);
             const url = urlMatch ? this.cleanXMLText(urlMatch[1]) : 'https://medlineplus.gov';
             
-            // Extract ID
             const idMatch = docXML.match(/<id[^>]*>(.*?)<\/id>/s) ||
                           docXML.match(/id=["']([^"']+)["']/);
             const id = idMatch ? this.cleanXMLText(idMatch[1]) : `medlineplus-${topic}`;
@@ -155,7 +142,7 @@ class MedlinePlusService {
                 title: title,
                 summary: summary.length > 500 ? summary.substring(0, 500) + '...' : summary,
                 url: url,
-                lastRevised: new Date().toISOString().split('T')[0], // Default to today
+                lastRevised: new Date().toISOString().split('T')[0],
                 source: 'MedlinePlus'
             };
             
@@ -165,10 +152,8 @@ class MedlinePlusService {
         }
     }
 
-    // Extract simple XML information
     extractSimpleXMLInfo(xmlText, topic) {
         try {
-            // Look for any content about the topic
             const patterns = [
                 new RegExp(`<[^>]*>${topic}[^<]*</[^>]*>`, 'gi'),
                 new RegExp(`<[^>]*>[^<]*${topic}[^<]*</[^>]*>`, 'gi')
@@ -196,17 +181,14 @@ class MedlinePlusService {
         return null;
     }
 
-    // Extract any readable text content
     extractTextContent(xmlText, topic) {
         try {
-            // Remove XML tags and extract readable content
             const textContent = xmlText
-                .replace(/<[^>]*>/g, ' ')  // Remove all XML tags
-                .replace(/\s+/g, ' ')      // Normalize whitespace
+                .replace(/<[^>]*>/g, ' ')
+                .replace(/\s+/g, ' ')
                 .trim();
             
             if (textContent.length > 50) {
-                // Look for sentences containing the topic
                 const sentences = textContent.split(/[.!?]+/);
                 const relevantSentences = sentences.filter(sentence => 
                     sentence.toLowerCase().includes(topic.toLowerCase()) && 
@@ -232,20 +214,18 @@ class MedlinePlusService {
         return null;
     }
 
-    // Clean XML text content
     cleanXMLText(text) {
         return text
-            .replace(/<[^>]*>/g, '')      // Remove XML tags
-            .replace(/&lt;/g, '<')       // Decode HTML entities
+            .replace(/<[^>]*>/g, '')
+            .replace(/&lt;/g, '<')
             .replace(/&gt;/g, '>')
             .replace(/&amp;/g, '&')
             .replace(/&quot;/g, '"')
             .replace(/&#39;/g, "'")
-            .replace(/\s+/g, ' ')        // Normalize whitespace
+            .replace(/\s+/g, ' ')
             .trim();
     }
 
-    // Enhanced fallback with better topic-specific content
     getFallbackHealthInfo(topic) {
         const fallbackDatabase = {
             'headache': {
@@ -295,7 +275,29 @@ class MedlinePlusService {
         }];
     }
 
-    // Keep existing methods unchanged
+    formatHealthTopics(data) {
+        const topics = [];
+        
+        try {
+            if (data.nlmSearchResult?.list?.document) {
+                for (const doc of data.nlmSearchResult.list.document.slice(0, 3)) {
+                    topics.push({
+                        id: doc.id || 'medlineplus-topic',
+                        title: doc.content?.title || `Health information`,
+                        summary: doc.content?.summary || 'Health information available from MedlinePlus',
+                        url: doc.content?.url || 'https://medlineplus.gov',
+                        lastRevised: doc.content?.lastRevised || 'Recently updated',
+                        source: 'MedlinePlus'
+                    });
+                }
+            }
+        } catch (error) {
+            console.error('Error formatting MedlinePlus JSON results:', error);
+        }
+        
+        return topics;
+    }
+
     async makeRequest(url) {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), this.timeout);
@@ -332,30 +334,6 @@ class MedlinePlusService {
         this.lastRequestTime = Date.now();
     }
 
-    // Keep existing formatHealthTopics method for JSON responses
-    formatHealthTopics(data) {
-        const topics = [];
-        
-        try {
-            if (data.nlmSearchResult?.list?.document) {
-                for (const doc of data.nlmSearchResult.list.document.slice(0, 3)) {
-                    topics.push({
-                        id: doc.id || 'medlineplus-topic',
-                        title: doc.content?.title || `Health information about ${topic}`,
-                        summary: doc.content?.summary || 'Health information available from MedlinePlus',
-                        url: doc.content?.url || 'https://medlineplus.gov',
-                        lastRevised: doc.content?.lastRevised || 'Recently updated',
-                        source: 'MedlinePlus'
-                    });
-                }
-            }
-        } catch (error) {
-            console.error('Error formatting MedlinePlus JSON results:', error);
-        }
-        
-        return topics;
-    }
-
     async healthCheck() {
         try {
             const start = Date.now();
@@ -381,7 +359,4 @@ class MedlinePlusService {
     }
 }
 
-
-
-// Export all services
-module.exports = {MedlinePlusService};
+module.exports = { MedlinePlusService };

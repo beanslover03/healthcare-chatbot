@@ -1,5 +1,7 @@
 // backend/services/medical-apis/openfda-service.js
-// OpenFDA Drug Safety and Adverse Events
+// Complete OpenFDA Drug Safety and Adverse Events Service
+
+const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
 
 class OpenFDAService {
     constructor(cacheManager) {
@@ -185,10 +187,16 @@ class OpenFDAService {
 
     async healthCheck() {
         try {
+            const start = Date.now();
             const testResult = await this.searchDrugLabels('aspirin', { limit: 1, skipCache: true });
+            const responseTime = Date.now() - start;
+            
             return {
                 service: 'OpenFDA',
-                status: testResult.length > 0 ? 'healthy' : 'degraded',
+                status: testResult.length > 0 && testResult[0].source !== 'OpenFDA-Fallback' ? 'healthy' : 'degraded',
+                responseTime: responseTime,
+                dataFound: testResult.length,
+                dataSource: testResult[0]?.source || 'unknown',
                 lastChecked: new Date().toISOString()
             };
         } catch (error) {
@@ -202,4 +210,4 @@ class OpenFDAService {
     }
 }
 
-module.exports = {OpenFDAService};
+module.exports = OpenFDAService;
