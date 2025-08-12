@@ -202,4 +202,4 @@ class OpenFDAService {
     }
 }
 
-module.exports = {MedlinePlusService, OpenFDAService };
+module.exports = {OpenFDAService};
