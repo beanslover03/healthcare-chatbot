@@ -5,8 +5,8 @@ const cors = require('cors');
 const path = require('path');
 require('dotenv').config();
 
-const ClaudeService = require('./services/claude-service');
-const MedicalAPIService = require('./services/medical-apis'); // Now includes all 5 services
+const PureAPIDrivenClaudeService = require('./services/claude-service');
+const { PureAPIDrivenMedicalService } = require('./services/medical-apis/pure-api-driven-service');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -16,11 +16,11 @@ let claudeService, medicalAPI;
 async function initializeServices() {
     try {
         console.log('🔍 Initializing Enhanced Claude service...');
-        claudeService = new ClaudeService();
+        claudeService = new PureAPIDrivenClaudeService();
         console.log('✅ Enhanced Claude service initialized');
         
         console.log('🔍 Initializing Enhanced Medical API service...');
-        medicalAPI = new MedicalAPIService();
+        medicalAPI = new PureAPIDrivenMedicalService();
         console.log('✅ Enhanced Medical API service initialized with 5 databases');
         
         // Test all medical APIs on startup

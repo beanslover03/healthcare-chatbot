@@ -1,413 +1,244 @@
-// backend/services/claude-service.js - ENHANCED VERSION WITH ODPHP INTEGRATION
+// backend/services/claude-service.js - PURE API-DRIVEN VERSION
 
 const Anthropic = require('@anthropic-ai/sdk');
 
-class ClaudeService {
+class PureAPIDrivenClaudeService {
     constructor() {
         this.anthropic = new Anthropic({
             apiKey: process.env.ANTHROPIC_API_KEY
         });
-        
-        this.medicalMappings = require('../config/medical-mappings');
 
-        // Enhanced system prompts with ODPHP awareness
-        this.systemPrompts = {
-            conversational: `You are a caring medical assistant with access to comprehensive health guidance.
-        
-        STYLE:
-        - Be warm and empathetic
-        - Ask 1-2 follow-up questions to understand better
-        - Keep responses to 2-3 sentences unless it's an emergency
-        - When you have personalized health recommendations, mention them naturally
-        
-        REMEMBER: You have access to evidence-based health guidance from MyHealthfinder.`,
-        
-            medication_counselor: `You are helping with medication questions with access to safety data and health guidance.
-        
-        STYLE:
-        - Ask about their specific medication concerns
-        - Keep safety-focused but conversational
-        - Integrate preventive health recommendations when relevant`,
-        
-            emergency_triage: `You are assessing potentially urgent situations.
-        
-        STYLE:
-        - Be direct and calm
-        - Give immediate guidance if truly urgent
-        - Ask key questions to assess severity`,
-        
-            health_educator: `You are helping someone understand health topics with comprehensive educational resources.
-        
-        STYLE:
-        - Ask what specifically they want to know
-        - Give clear, simple explanations
-        - Use available health guidance to provide complete answers
-        - Mention preventive care recommendations when appropriate`,
-        
-            research_advisor: `You are helping with treatment and research questions.
-        
-        STYLE:
-        - Ask about their specific interests in research/treatments
-        - Be encouraging but realistic
-        - Integrate clinical trials and health guidance information`
-        };
+        // Single system prompt - let APIs provide the medical context
+        this.systemPrompt = `You are a helpful healthcare AI assistant. You will be given medical information retrieved from various medical databases and APIs. Your job is to:
 
-        // Enhanced context detection including health topics
-        this.contextTriggers = {
-            medication_counselor: [
-                'medication', 'drug', 'prescription', 'side effects', 'dosage',
-                'taking', 'pills', 'interactions', 'pharmacy', 'medicine'
-            ],
-            research_advisor: [
-                'clinical trial', 'research', 'study', 'experimental', 'treatment options',
-                'latest research', 'new treatments', 'studies show'
-            ],
-            emergency_triage: [
-                'emergency', 'urgent', 'severe', 'can\'t breathe', 'chest pain',
-                'call 911', 'hospital', 'ambulance', 'immediate', 'critical'
-            ],
-            health_educator: [
-                'what is', 'how does', 'explain', 'learn about', 'understand',
-                'information about', 'tell me about', 'causes of', 'prevention',
-                'healthy lifestyle', 'wellness', 'nutrition', 'exercise'
-            ]
-        };
+1. Analyze the medical data provided and create a helpful response based on that data
+2. If medical data is provided, integrate it naturally into your response
+3. Always prioritize user safety and recommend professional medical consultation when appropriate
+3. Be empathetic, clear, and conversational
+5. If emergency-sounding symptoms are mentioned, recommend immediate medical attention
+6. Keep responses fairly brief, do not overwhelm user with information
+
+IMPORTANT: Base your medical knowledge entirely on the API data provided in each request. Do not rely on pre-trained medical knowledge beyond basic safety guidelines.
+
+Special note: If anyone mentions One Piece or Chopper, express that you love Chopper - he's an adorable doctor!`;
 
         this.userProfiles = new Map();
         
-        console.log('🧠 Enhanced Claude Service initialized with ODPHP integration');
+        console.log('🧠 Pure API-Driven Claude Service initialized');
     }
 
-    // Enhanced symptom assessment with ODPHP integration
+    // ===== PURE API-DRIVEN ASSESSMENT =====
     async assessSymptoms(userMessage, medicalAnalysis, conversationHistory = [], sessionId = 'default') {
         try {
-            console.log('🧠 Starting enhanced symptom assessment with ODPHP data...');
+            console.log('🧠 Processing pure API-driven assessment...');
 
-            // 1. Detect optimal context
-            const context = this.detectMedicalContext(userMessage, medicalAnalysis);
-            console.log(`📋 Using context: ${context}`);
+            // Build prompt entirely from API responses
+            const apiDrivenPrompt = this.buildPureAPIPrompt(userMessage, medicalAnalysis);
 
-            // 2. Build user profile
-            const userProfile = this.buildUserProfile(sessionId, conversationHistory, medicalAnalysis);
-
-            // 3. Generate enhanced prompt with ODPHP data
-            const enhancedPrompt = this.buildEnhancedPromptWithODPHP(userMessage, medicalAnalysis, context, userProfile);
-
-            // 4. Get response using appropriate system prompt
-            const systemPrompt = this.systemPrompts[context] || this.systemPrompts.conversational;
-            
+            // Single API call with API-provided context
             const response = await this.anthropic.messages.create({
                 model: "claude-3-5-sonnet-20241022",
-                max_tokens: 700, // Increased for richer responses
+                max_tokens: 600,
                 temperature: 0.7,
-                system: systemPrompt,
+                system: this.systemPrompt,
                 messages: [
-                    ...conversationHistory.slice(-4),
-                    { role: "user", content: enhancedPrompt }
+                    ...conversationHistory.slice(-3),
+                    { role: "user", content: apiDrivenPrompt }
                 ]
             });
 
-            // 5. Enhance response with ODPHP data
-            let enhancedResponse = response.content[0].text;
-            enhancedResponse = this.enhanceWithODPHPData(enhancedResponse, medicalAnalysis, context);
+            let finalResponse = response.content[0].text;
 
-            // 6. Format based on context and user profile
-            enhancedResponse = this.formatForUser(enhancedResponse, context, userProfile);
+            // Add One Piece easter egg check
+            finalResponse = this.addOnePieceEasterEgg(finalResponse, userMessage);
 
-            console.log(`✅ Enhanced response generated with ODPHP data (${context}, ${userProfile.communicationStyle} style)`);
+            // Add API transparency note if significant data was used
+            finalResponse = this.addAPITransparencyNote(finalResponse, medicalAnalysis);
+
+            console.log(`✅ Pure API-driven response generated`);
 
             return {
                 success: true,
-                response: enhancedResponse,
+                response: finalResponse,
                 metadata: {
-                    context: context,
-                    userProfile: userProfile,
                     apiSources: medicalAnalysis?.apiSources || [],
-                    confidence: medicalAnalysis?.confidence || 'medium',
-                    odphpDataUsed: this.hasODPHPData(medicalAnalysis)
+                    confidence: medicalAnalysis?.confidence || 'low',
+                    searchAttempts: medicalAnalysis?.searchAttempts || 0,
+                    successfulSearches: medicalAnalysis?.successfulSearches || 0,
+                    dataUsed: this.hasAPIData(medicalAnalysis)
                 }
             };
 
         } catch (error) {
-            console.error('❌ Enhanced assessment error:', error);
-            
-            const fallbackResponse = await this.generateBasicResponse(userMessage, medicalAnalysis);
+            console.error('❌ Pure API assessment error:', error);
             return {
                 success: true,
-                response: fallbackResponse,
+                response: await this.generateFallbackResponse(userMessage),
                 metadata: { fallback: true }
             };
         }
     }
 
-    // NEW: Enhanced prompt building with ODPHP data
-    buildEnhancedPromptWithODPHP(userMessage, medicalAnalysis, context, userProfile) {
+    // ===== BUILD PROMPT FROM PURE API DATA =====
+    buildPureAPIPrompt(userMessage, medicalAnalysis) {
         let prompt = `User said: "${userMessage}"\n\n`;
-    
-        // Add medical context briefly
-        if (medicalAnalysis?.symptoms?.length > 0) {
-            const mainSymptom = medicalAnalysis.symptoms[0];
-            prompt += `Main symptom identified: ${mainSymptom.name}\n`;
+
+        if (!medicalAnalysis || medicalAnalysis.searchAttempts === 0) {
+            prompt += `No medical database searches were performed for this message.\n\n`;
+            prompt += `Please provide general health guidance and suggest consulting healthcare professionals if this involves medical concerns.`;
+            return prompt;
         }
 
-        // NEW: Add ODPHP health guidance context
-        if (medicalAnalysis?.healthGuidance?.length > 0) {
-            const guidance = medicalAnalysis.healthGuidance[0];
-            prompt += `Health guidance available: ${guidance.title}\n`;
+        // Add search performance context
+        prompt += `Medical Database Search Results:\n`;
+        prompt += `- Searched ${medicalAnalysis.extractedWords?.length || 0} terms across medical databases\n`;
+        prompt += `- Performed ${medicalAnalysis.searchAttempts} API searches\n`;
+        prompt += `- Found relevant data in ${medicalAnalysis.successfulSearches} searches\n`;
+        prompt += `- Confidence level: ${medicalAnalysis.confidence}\n\n`;
+
+        // Add API data if available
+        const consolidated = medicalAnalysis.consolidatedData || {};
+
+        if (consolidated.medications && consolidated.medications.length > 0) {
+            prompt += `MEDICATIONS FOUND:\n`;
+            for (const med of consolidated.medications.slice(0, 3)) {
+                prompt += `- ${med.name || med.title || 'Medication'} (Source: ${med.source || 'Medical Database'})\n`;
+                if (med.description) prompt += `  Description: ${med.description.substring(0, 100)}...\n`;
+            }
+            prompt += `\n`;
         }
 
-        // NEW: Add ODPHP personalized recommendations context
-        if (medicalAnalysis?.preventiveRecommendations?.length > 0) {
-            const rec = medicalAnalysis.preventiveRecommendations[0];
-            prompt += `Personalized health recommendation: ${rec.title}\n`;
+        if (consolidated.conditions && consolidated.conditions.length > 0) {
+            prompt += `MEDICAL CONDITIONS FOUND:\n`;
+            for (const condition of consolidated.conditions.slice(0, 3)) {
+                prompt += `- ${condition.name || condition.title || 'Condition'} (Source: ${condition.source || 'Medical Database'})\n`;
+                if (condition.code) prompt += `  Code: ${condition.code}\n`;
+            }
+            prompt += `\n`;
         }
 
-        // NEW: Add ODPHP educational resources context
-        if (medicalAnalysis?.educationalResources?.length > 0) {
-            const edu = medicalAnalysis.educationalResources[0];
-            prompt += `Educational resource: ${edu.information?.title || 'Health education available'}\n`;
+        if (consolidated.healthInformation && consolidated.healthInformation.length > 0) {
+            prompt += `HEALTH INFORMATION FOUND:\n`;
+            for (const info of consolidated.healthInformation.slice(0, 2)) {
+                prompt += `- ${info.title || 'Health Information'} (Source: ${info.source || 'Health Database'})\n`;
+                if (info.summary) prompt += `  Summary: ${info.summary.substring(0, 150)}...\n`;
+            }
+            prompt += `\n`;
         }
-    
-        // Add simple context instruction
-        switch (context) {
-            case 'emergency_triage':
-                prompt += `This seems urgent. Respond with immediate guidance but keep it brief and clear.\n`;
-                break;
-            case 'medication_counselor':
-                prompt += `Focus on medication questions. Ask what they want to know specifically.\n`;
-                break;
-            case 'health_educator':
-                prompt += `This is about health education. Use available health guidance to provide comprehensive information.\n`;
-                break;
-            default:
-                prompt += `Respond conversationally. Ask 1-2 follow-up questions to understand better.\n`;
+
+        if (consolidated.clinicalTrials && consolidated.clinicalTrials.length > 0) {
+            prompt += `CLINICAL TRIALS FOUND:\n`;
+            for (const trial of consolidated.clinicalTrials.slice(0, 2)) {
+                prompt += `- ${trial.title || 'Clinical Study'} (Status: ${trial.status || 'Unknown'})\n`;
+                if (trial.phase) prompt += `  Phase: ${trial.phase}\n`;
+            }
+            prompt += `\n`;
         }
-    
-        // Add user style
-        if (userProfile.communicationStyle === 'concise') {
-            prompt += `Keep response short and direct.\n`;
+
+        if (consolidated.drugSafety && consolidated.drugSafety.length > 0) {
+            prompt += `DRUG SAFETY INFORMATION:\n`;
+            for (const safety of consolidated.drugSafety.slice(0, 2)) {
+                prompt += `- ${safety.brandName || safety.reaction || 'Safety Information'}\n`;
+                if (safety.warnings) prompt += `  Warning: ${safety.warnings.substring(0, 100)}...\n`;
+            }
+            prompt += `\n`;
         }
-    
-        prompt += `\nBe conversational, empathetic, and naturally integrate available health guidance and recommendations.`;
-    
+
+        if (consolidated.healthGuidance && consolidated.healthGuidance.length > 0) {
+            prompt += `HEALTH GUIDANCE FOUND:\n`;
+            for (const guidance of consolidated.healthGuidance.slice(0, 2)) {
+                prompt += `- ${guidance.title || 'Health Guidance'} (Source: MyHealthfinder)\n`;
+                if (guidance.summary) prompt += `  Guidance: ${guidance.summary.substring(0, 150)}...\n`;
+            }
+            prompt += `\n`;
+        }
+
+        if (consolidated.preventiveRecommendations && consolidated.preventiveRecommendations.length > 0) {
+            prompt += `PERSONALIZED RECOMMENDATIONS:\n`;
+            for (const rec of consolidated.preventiveRecommendations.slice(0, 2)) {
+                prompt += `- ${rec.title || 'Health Recommendation'}\n`;
+                if (rec.summary) prompt += `  Details: ${rec.summary.substring(0, 100)}...\n`;
+            }
+            prompt += `\n`;
+        }
+
+        // Final instruction
+        prompt += `Based on the medical database information above, please provide a helpful, empathetic response that integrates this data naturally. If no relevant medical data was found, provide general health guidance and recommend consulting healthcare professionals.`;
+
         return prompt;
     }
 
-    // NEW: Enhanced response enhancement with ODPHP data
-    enhanceWithODPHPData(response, medicalAnalysis, context) {
-        let enhanced = response;
-    
-        // Add ODPHP health guidance if relevant
-        if (medicalAnalysis?.healthGuidance?.length > 0 && context === 'health_educator') {
-            const guidance = medicalAnalysis.healthGuidance[0];
-            if (guidance.summary) {
-                enhanced += ` According to MyHealthfinder, ${guidance.summary.substring(0, 150)}...`;
-            }
-        }
-
-        // Add personalized recommendations naturally
-        if (medicalAnalysis?.preventiveRecommendations?.length > 0) {
-            const rec = medicalAnalysis.preventiveRecommendations[0];
-            if (rec.title && !enhanced.toLowerCase().includes('recommend')) {
-                enhanced += ` Based on health guidelines, you might also consider looking into ${rec.title.toLowerCase()}.`;
-            }
-        }
-
-        // Add educational resources for complex topics
-        if (medicalAnalysis?.educationalResources?.length > 0 && context === 'health_educator') {
-            const eduResource = medicalAnalysis.educationalResources[0];
-            if (eduResource.information?.title) {
-                enhanced += ` For more detailed information about ${eduResource.symptom}, MyHealthfinder provides guidance on ${eduResource.information.title.toLowerCase()}.`;
-            }
-        }
-
-        // Show comprehensive data sources if multiple APIs used
-        if (medicalAnalysis?.apiSources?.length >= 4) {
-            enhanced += ` (This assessment uses ${medicalAnalysis.apiSources.length} medical databases including MyHealthfinder)`;
-        }
-    
-        return enhanced;
-    }
-
-    // NEW: Check if ODPHP data is available
-    hasODPHPData(medicalAnalysis) {
+    // ===== CHECK IF API DATA EXISTS =====
+    hasAPIData(medicalAnalysis) {
         if (!medicalAnalysis) return false;
         
+        const consolidated = medicalAnalysis.consolidatedData || {};
         return (
-            (medicalAnalysis.healthGuidance && medicalAnalysis.healthGuidance.length > 0) ||
-            (medicalAnalysis.preventiveRecommendations && medicalAnalysis.preventiveRecommendations.length > 0) ||
-            (medicalAnalysis.educationalResources && medicalAnalysis.educationalResources.length > 0) ||
-            (medicalAnalysis.apiSources && medicalAnalysis.apiSources.some(source => source.includes('ODPHP')))
+            (consolidated.medications && consolidated.medications.length > 0) ||
+            (consolidated.conditions && consolidated.conditions.length > 0) ||
+            (consolidated.healthInformation && consolidated.healthInformation.length > 0) ||
+            (consolidated.clinicalTrials && consolidated.clinicalTrials.length > 0) ||
+            (consolidated.drugSafety && consolidated.drugSafety.length > 0) ||
+            (consolidated.healthGuidance && consolidated.healthGuidance.length > 0) ||
+            (consolidated.preventiveRecommendations && consolidated.preventiveRecommendations.length > 0)
         );
     }
 
-    // Enhanced context detection considering ODPHP data
-    detectMedicalContext(userMessage, medicalAnalysis) {
+    // ===== ADD API TRANSPARENCY =====
+    addAPITransparencyNote(response, medicalAnalysis) {
+        if (!medicalAnalysis || medicalAnalysis.successfulSearches === 0) {
+            return response;
+        }
+
+        const apiCount = medicalAnalysis.apiSources ? medicalAnalysis.apiSources.length : 0;
+        const searchSuccess = medicalAnalysis.searchAttempts > 0 ? 
+            Math.round((medicalAnalysis.successfulSearches / medicalAnalysis.searchAttempts) * 100) : 0;
+
+        if (apiCount >= 3) {
+            return response + ` 📊 (This response used data from ${apiCount} medical databases with ${searchSuccess}% search success rate)`;
+        } else if (apiCount > 0) {
+            return response + ` 📊 (Based on medical database information with ${searchSuccess}% search success rate)`;
+        }
+
+        return response;
+    }
+
+    // ===== ONE PIECE EASTER EGG =====
+    addOnePieceEasterEgg(response, userMessage) {
         const messageLower = userMessage.toLowerCase();
         
-        // Emergency context takes highest priority
-        if (this.isEmergency(userMessage) || medicalAnalysis?.emergencyFactors?.length > 0) {
-            return 'emergency_triage';
-        }
+        const onePieceTriggers = [
+            'one piece', 'onepiece', 'luffy', 'zoro', 'sanji', 'nami', 'usopp', 
+            'chopper', 'robin', 'franky', 'brook', 'jinbe', 'straw hat', 'pirate king',
+            'grand line', 'devil fruit', 'haki'
+        ];
 
-        // Check for explicit context triggers
-        for (const [context, triggers] of Object.entries(this.contextTriggers)) {
-            if (triggers.some(trigger => messageLower.includes(trigger))) {
-                return context;
+        if (onePieceTriggers.some(trigger => messageLower.includes(trigger))) {
+            if (messageLower.includes('chopper')) {
+                response += `\n\n🦌 By the way, I absolutely love Chopper! He's such an adorable and skilled doctor in One Piece!`;
+            } else {
+                response += `\n\n🦌 Speaking of healthcare, I have to say I love Chopper from One Piece - he's the cutest doctor ever!`;
             }
         }
 
-        // Context based on API data availability (including ODPHP)
-        if (medicalAnalysis?.medications?.length > 0 || medicalAnalysis?.apiSources?.includes('RxNorm')) {
-            return 'medication_counselor';
-        }
-
-        if (medicalAnalysis?.clinicalTrials?.length > 0) {
-            return 'research_advisor';
-        }
-
-        // NEW: Health educator context for ODPHP data
-        if (medicalAnalysis?.healthGuidance?.length > 0 || 
-            medicalAnalysis?.preventiveRecommendations?.length > 0 ||
-            medicalAnalysis?.educationalResources?.length > 0) {
-            return 'health_educator';
-        }
-
-        if (messageLower.includes('what') || messageLower.includes('explain')) {
-            return 'health_educator';
-        }
-
-        return 'conversational';
+        return response;
     }
 
-    // Enhanced user profiling with health interests
-    buildUserProfile(sessionId, conversationHistory, medicalAnalysis) {
-        let profile = this.userProfiles.get(sessionId) || {
-            interactionCount: 0,
-            knowledgeLevel: 'medium',
-            communicationStyle: 'balanced',
-            preferredDetail: 'moderate',
-            healthInterests: [], // NEW: Track health topics of interest
-            lastSeen: null
-        };
-
-        profile.interactionCount++;
-        profile.lastSeen = Date.now();
-
-        // Track health interests based on ODPHP data
-        if (medicalAnalysis?.healthGuidance) {
-            for (const guidance of medicalAnalysis.healthGuidance) {
-                if (guidance.categories) {
-                    profile.healthInterests.push(...guidance.categories);
-                }
-            }
-        }
-
-        // Analyze communication style from conversation
-        if (conversationHistory.length > 0) {
-            const userMessages = conversationHistory.filter(msg => msg.role === 'user');
-            profile.communicationStyle = this.analyzeCommunicationStyle(userMessages);
-            profile.knowledgeLevel = this.assessKnowledgeLevel(userMessages);
-        }
-
-        // Clean up health interests (keep unique, limit to 10)
-        profile.healthInterests = [...new Set(profile.healthInterests)].slice(0, 10);
-
-        this.userProfiles.set(sessionId, profile);
-        return profile;
-    }
-
-    // Keep all existing methods (they remain unchanged)
-    analyzeCommunicationStyle(userMessages) {
-        if (userMessages.length === 0) return 'balanced';
-
-        let avgLength = 0;
-        let technicalTerms = 0;
-        let urgencyIndicators = 0;
-
-        userMessages.forEach(msg => {
-            avgLength += msg.content.length;
-            
-            // Count medical terms
-            const medTerms = ['diagnosis', 'symptoms', 'medication', 'treatment'];
-            technicalTerms += medTerms.filter(term => 
-                msg.content.toLowerCase().includes(term)
-            ).length;
-
-            // Count urgency words
-            const urgentWords = ['urgent', 'emergency', 'severe', 'immediately'];
-            urgencyIndicators += urgentWords.filter(word => 
-                msg.content.toLowerCase().includes(word)
-            ).length;
-        });
-
-        avgLength = avgLength / userMessages.length;
-
-        if (urgencyIndicators > 1) return 'urgent';
-        if (technicalTerms > 2) return 'technical';
-        if (avgLength > 100) return 'detailed';
-        if (avgLength < 30) return 'concise';
+    // ===== EMERGENCY DETECTION (BASIC ONLY) =====
+    isEmergency(userMessage) {
+        const messageLower = userMessage.toLowerCase();
         
-        return 'balanced';
-    }
-
-    assessKnowledgeLevel(userMessages) {
-        let score = 0;
+        // Only the most obvious emergency keywords - no hardcoded medical knowledge
+        const emergencyKeywords = [
+            'call 911', 'emergency', 'ambulance', 'hospital now', 'can\'t breathe', 
+            'crushing chest pain', 'severe bleeding', 'unconscious', 'overdose',
+            'suicide', 'heart attack', 'stroke', 'severe allergic reaction'
+        ];
         
-        userMessages.forEach(msg => {
-            const content = msg.content.toLowerCase();
-            
-            // Advanced terms (+2 points)
-            const advanced = ['pathophysiology', 'contraindication', 'pharmacokinetics'];
-            score += advanced.filter(term => content.includes(term)).length * 2;
-
-            // Intermediate terms (+1 point)
-            const intermediate = ['side effects', 'dosage', 'interaction', 'diagnosis'];
-            score += intermediate.filter(term => content.includes(term)).length;
-
-            // Basic terms (+0.5 points)
-            const basic = ['symptoms', 'medicine', 'doctor', 'treatment'];
-            score += basic.filter(term => content.includes(term)).length * 0.5;
-        });
-
-        const avgScore = score / userMessages.length;
-        
-        if (avgScore >= 2.5) return 'high';
-        if (avgScore >= 1) return 'medium';
-        return 'basic';
+        return emergencyKeywords.some(keyword => messageLower.includes(keyword));
     }
 
-    formatForUser(response, context, userProfile) {
-        let formatted = response;
-    
-        // Only simplify language for basic users, don't add extra content
-        if (userProfile.knowledgeLevel === 'basic') {
-            const simplifications = {
-                'myocardial infarction': 'heart attack',
-                'hypertension': 'high blood pressure'
-            };
-            
-            Object.entries(simplifications).forEach(([complex, simple]) => {
-                formatted = formatted.replace(new RegExp(complex, 'gi'), simple);
-            });
-        }
-    
-        return formatted;
-    }
-
-    async generateBasicResponse(userMessage, medicalAnalysis) {
-        const response = await this.anthropic.messages.create({
-            model: "claude-3-5-sonnet-20241022",
-            max_tokens: 400,
-            temperature: 0.7,
-            system: this.systemPrompts.conversational,
-            messages: [{ role: "user", content: userMessage }]
-        });
-
-        return response.content[0].text;
-    }
-
-    // All existing methods remain the same
+    // ===== CONVERSATION ENDING DETECTION =====
     isConversationEnding(userMessage) {
         const endingSignals = [
             'thanks', 'thank you', 'that helps', 'that\'s all', 'i\'m good',
@@ -418,64 +249,68 @@ class ClaudeService {
         return endingSignals.some(signal => messageLower.includes(signal));
     }
 
-    isEmergency(userMessage) {
-        const messageLower = userMessage.toLowerCase();
-        
-        const emergencyPatterns = this.medicalMappings.emergencyPatterns;
-        
-        for (const [conditionId, pattern] of Object.entries(emergencyPatterns)) {
-            const hasEmergencyKeywords = pattern.keywords.some(keyword => 
-                messageLower.includes(keyword.toLowerCase())
-            );
-            
-            const hasEmergencySymptoms = pattern.symptoms.some(symptom => 
-                messageLower.includes(symptom.toLowerCase())
-            );
-            
-            const hasRedFlags = pattern.redFlags.some(flag => 
-                messageLower.includes(flag.toLowerCase())
-            );
-            
-            if (hasEmergencyKeywords || (hasEmergencySymptoms && hasRedFlags)) {
-                console.log(`🚨 Emergency detected: ${conditionId}`);
-                return true;
-            }
-        }
-        
-        return false;
-    }
-
-    async generateEndingResponse(conversationHistory = []) {
-        return this.getChatResponse(
-            "User is ending the conversation. Give a warm, caring goodbye with a gentle reminder about health resources.",
-            conversationHistory,
-            'ending_conversation'
-        );
-    }
-
-    async generateEmergencyResponse(userMessage, conversationHistory = []) {
-        return this.getChatResponse(
-            `User said: "${userMessage}" - This seems like a medical emergency. Respond with urgent but calm guidance.`,
-            conversationHistory,
-            'emergency_triage'
-        );
-    }
-
-    async getChatResponse(prompt, conversationHistory = [], responseType = 'conversational') {
+    // ===== FALLBACK RESPONSE =====
+    async generateFallbackResponse(userMessage) {
         try {
-            const systemPrompt = this.systemPrompts[responseType] || this.systemPrompts.conversational;
-            
-            const messages = [
-                ...conversationHistory.slice(-4),
-                { role: "user", content: prompt }
-            ];
-
             const response = await this.anthropic.messages.create({
                 model: "claude-3-5-sonnet-20241022",
                 max_tokens: 300,
                 temperature: 0.7,
-                system: systemPrompt,
-                messages: messages
+                system: this.systemPrompt,
+                messages: [{ 
+                    role: "user", 
+                    content: `User said: "${userMessage}"\n\nNo medical database information is available. Please provide general health guidance and recommend consulting healthcare professionals for medical concerns.`
+                }]
+            });
+
+            return response.content[0].text;
+        } catch (error) {
+            return "I'm having technical difficulties right now. For urgent medical concerns, please contact your healthcare provider or call 911 if it's an emergency.";
+        }
+    }
+
+    // ===== EMERGENCY RESPONSE =====
+    async generateEmergencyResponse(userMessage, conversationHistory = []) {
+        const response = await this.anthropic.messages.create({
+            model: "claude-3-5-sonnet-20241022",
+            max_tokens: 200,
+            temperature: 0.5,
+            system: this.systemPrompt,
+            messages: [
+                { role: "user", content: `EMERGENCY: "${userMessage}" - This appears to be a medical emergency. Provide immediate, calm guidance and recommend calling 911.` }
+            ]
+        });
+
+        return response.content[0].text;
+    }
+
+    // ===== ENDING RESPONSE =====
+    async generateEndingResponse(conversationHistory = []) {
+        const response = await this.anthropic.messages.create({
+            model: "claude-3-5-sonnet-20241022",
+            max_tokens: 150,
+            temperature: 0.7,
+            system: this.systemPrompt,
+            messages: [
+                { role: "user", content: "User is ending the conversation. Provide a warm, caring goodbye with health reminders." }
+            ]
+        });
+
+        return response.content[0].text;
+    }
+
+    // ===== GENERAL CHAT RESPONSE =====
+    async getChatResponse(prompt, conversationHistory = []) {
+        try {
+            const response = await this.anthropic.messages.create({
+                model: "claude-3-5-sonnet-20241022",
+                max_tokens: 400,
+                temperature: 0.7,
+                system: this.systemPrompt,
+                messages: [
+                    ...conversationHistory.slice(-3),
+                    { role: "user", content: prompt }
+                ]
             });
 
             return response.content[0].text;
@@ -486,13 +321,14 @@ class ClaudeService {
         }
     }
 
+    // ===== HEALTH CHECK =====
     async healthCheck() {
         try {
             const response = await this.anthropic.messages.create({
                 model: "claude-3-5-sonnet-20241022",
                 max_tokens: 50,
                 messages: [
-                    { role: "user", content: "Say 'Enhanced Claude with ODPHP ready' if you can help with medical conversations." }
+                    { role: "user", content: "Say 'Pure API-driven Claude ready for healthcare conversations' if working properly." }
                 ]
             });
 
@@ -500,10 +336,9 @@ class ClaudeService {
                 status: 'healthy',
                 response: response.content[0].text,
                 model: 'claude-3-5-sonnet-20241022',
-                enhanced: true,
-                odphpIntegration: true,
-                contexts: Object.keys(this.systemPrompts).length,
-                userProfiles: this.userProfiles.size
+                approach: 'pure_api_driven',
+                userProfiles: this.userProfiles.size,
+                features: ['API-driven responses', 'No hardcoded medical knowledge', 'One Piece easter egg', 'Emergency detection']
             };
         } catch (error) {
             return {
@@ -513,31 +348,29 @@ class ClaudeService {
         }
     }
 
+    // ===== USER MANAGEMENT =====
     clearConversationContext(userId) {
         this.userProfiles.delete(userId);
-        console.log(`Cleared enhanced context for user ${userId}`);
+        console.log(`Cleared context for user ${userId}`);
     }
 
-    // Get enhanced analytics with ODPHP insights
     getEnhancedAnalytics(sessionId) {
         const profile = this.userProfiles.get(sessionId);
         
         return {
             userProfile: profile,
             totalProfiles: this.userProfiles.size,
-            availableContexts: Object.keys(this.systemPrompts),
-            enhancedFeatures: [
-                'Context-aware responses',
-                'User profiling',
-                'API-driven intelligence', 
-                'Adaptive communication',
-                'Multi-modal formatting',
-                'ODPHP MyHealthfinder integration', // NEW
-                'Personalized health recommendations', // NEW
-                'Evidence-based health guidance' // NEW
+            approach: 'pure_api_driven',
+            features: [
+                'Zero hardcoded medical knowledge',
+                'Pure API response integration',
+                'Real-time medical database queries',
+                'API transparency in responses',
+                'Emergency detection',
+                'One Piece easter egg detection'
             ]
         };
     }
 }
 
-module.exports = ClaudeService;
+module.exports = PureAPIDrivenClaudeService;
